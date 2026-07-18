@@ -27,9 +27,32 @@ namespace ENIApp
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
+            string myPath = Assembly.GetExecutingAssembly().Location;
+            if (string.IsNullOrEmpty(myPath))
+                myPath = Process.GetCurrentProcess().MainModule.FileName;
+            string dir = Path.GetDirectoryName(myPath);
+            string mainExe = Path.Combine(dir, "app.exe");
+
+            if (Path.GetFileName(myPath).ToLower() == "app_new.exe")
+            {
+                Thread.Sleep(2000);
+                try
+                {
+                    for (int i = 0; i < 10; i++)
+                    {
+                        try { File.Delete(mainExe); break; }
+                        catch { Thread.Sleep(500); }
+                    }
+                    File.Move(myPath, mainExe);
+                    Process.Start(mainExe);
+                }
+                catch { }
+                Environment.Exit(0);
+                return;
+            }
+
             try
             {
-                string dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                 string oldFile = Path.Combine(dir, "app.old.exe");
                 string newFile = Path.Combine(dir, "app.new.exe");
                 string vbsFile = Path.Combine(dir, "update.vbs");
@@ -100,35 +123,11 @@ namespace ENIApp
                     if (string.IsNullOrEmpty(currentPath))
                         currentPath = Process.GetCurrentProcess().MainModule.FileName;
                     string dir = Path.GetDirectoryName(currentPath);
-                    string newPath = Path.Combine(dir, "app.new.exe");
-                    string vbsPath = Path.Combine(dir, "update.vbs");
+                    string newPath = Path.Combine(dir, "app_new.exe");
 
                     File.WriteAllBytes(newPath, exeBytes);
 
-                    string vbs = "Set fso = CreateObject(\"Scripting.FileSystemObject\")\r\n" +
-                        "Set shell = CreateObject(\"WScript.Shell\")\r\n" +
-                        "WScript.Sleep 2000\r\n" +
-                        "Do While fso.FileExists(\"" + currentPath.Replace("\\", "\\\\") + "\")\r\n" +
-                        "  On Error Resume Next\r\n" +
-                        "  fso.DeleteFile \"" + currentPath.Replace("\\", "\\\\") + "\", True\r\n" +
-                        "  WScript.Sleep 500\r\n" +
-                        "Loop\r\n" +
-                        "fso.MoveFile \"" + newPath.Replace("\\", "\\\\") + "\", \"" + currentPath.Replace("\\", "\\\\") + "\"\r\n" +
-                        "shell.Run \"" + currentPath.Replace("\\", "\\\\") + "\", 1, False\r\n" +
-                        "On Error Resume Next\r\n" +
-                        "fso.DeleteFile \"" + vbsPath.Replace("\\", "\\\\") + "\", True\r\n";
-
-                    File.WriteAllText(vbsPath, vbs);
-
-                    ProcessStartInfo psi = new ProcessStartInfo();
-                    psi.FileName = "wscript.exe";
-                    psi.Arguments = "\"" + vbsPath + "\"";
-                    psi.WindowStyle = ProcessWindowStyle.Hidden;
-                    psi.CreateNoWindow = true;
-                    psi.UseShellExecute = true;
-                    Process.Start(psi);
-
-                    Thread.Sleep(500);
+                    Process.Start(newPath);
                     Environment.Exit(0);
                 }
             }
@@ -1153,6 +1152,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
