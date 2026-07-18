@@ -62,7 +62,7 @@ namespace ENIApp
             Application.Run(new MainForm());
         }
 
-        public static bool CheckForUpdate()
+public static bool CheckForUpdate()
         {
             try
             {
@@ -85,7 +85,7 @@ namespace ENIApp
                     {
                         if (forceUpdate)
                         {
-                            DownloadAndInstallUpdate();
+                            DownloadUpdateSilent();
                             return true;
                         }
                         // force=false: silently ignore, no prompt
@@ -97,7 +97,7 @@ namespace ENIApp
             return false;
         }
 
-        public static void DownloadAndInstallUpdate()
+        public static void DownloadUpdateSilent()
         {
             try
             {
@@ -120,14 +120,9 @@ namespace ENIApp
 
                     File.WriteAllBytes(newPath, exeBytes);
 
-                    // Launch self with --install-update flag, then exit
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = Assembly.GetExecutingAssembly().Location,
-                        Arguments = "--install-update",
-                        UseShellExecute = true
-                    });
-                    Environment.Exit(0);
+                    // Signal UI that update is ready
+                    if (UpdateReady != null)
+                        UpdateReady();
                 }
             }
             catch (Exception ex)
@@ -136,7 +131,8 @@ namespace ENIApp
             }
         }
 
-public static void InstallUpdateAndRestart(string currentPath)
+        // Called when app is launched with --install-update
+        public static void InstallUpdateAndRestart(string currentPath)
         {
             try
             {
@@ -145,7 +141,7 @@ public static void InstallUpdateAndRestart(string currentPath)
                 string oldPath = Path.Combine(dir, "app_old.exe");
 
                 // Wait for old process to fully exit
-                Thread.Sleep(3000);
+                Thread.Sleep(2000);
 
                 // Robust cleanup with retries
                 for (int i = 0; i < 10; i++)
@@ -166,7 +162,7 @@ public static void InstallUpdateAndRestart(string currentPath)
                     catch { Thread.Sleep(500); }
                 }
 
-                // Cleanup old file with retries
+                // Cleanup old file
                 for (int i = 0; i < 10; i++)
                 {
                     try { if (File.Exists(oldPath)) File.Delete(oldPath); break; }
@@ -179,8 +175,10 @@ public static void InstallUpdateAndRestart(string currentPath)
             finally
             {
                 Environment.Exit(0);
-            }
+}
         }
+
+        public static Action UpdateReady;
 
         public static object ParseJson(string json)
         {
@@ -398,7 +396,7 @@ public static void InstallUpdateAndRestart(string currentPath)
                         {
                             if (forceUpdate)
                             {
-                                try { this.Invoke(new Action(() => { Program.DownloadAndInstallUpdate(); })); } catch { }
+                                try { this.Invoke(new Action(() => { Program.DownloadUpdateSilent(); })); } catch { }
                             }
                             // force=false: silently ignore
                         }
@@ -1213,6 +1211,7 @@ content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel
         }
     }
 }
+
 
 
 
