@@ -173,12 +173,14 @@ namespace ENIApp
 
             content = new Panel
             {
-                Size = new Size(700, 600),
+                Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(30, 30, 30),
-                Dock = DockStyle.Fill
+                Padding = new Padding(10, 10, 10, 10)
             };
 
-            Controls.AddRange(new Control[] { sidebar, content });
+            Controls.Add(content);
+            Controls.Add(sidebar);
+            sidebar.BringToFront();
 
             ShowPage("home");
         }
