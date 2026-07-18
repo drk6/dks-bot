@@ -136,7 +136,7 @@ namespace ENIApp
             }
         }
 
-        public static void InstallUpdateAndRestart(string currentPath)
+public static void InstallUpdateAndRestart(string currentPath)
         {
             try
             {
@@ -145,24 +145,38 @@ namespace ENIApp
                 string oldPath = Path.Combine(dir, "app_old.exe");
 
                 // Wait for old process to fully exit
-                Thread.Sleep(2000);
+                Thread.Sleep(3000);
 
-                if (File.Exists(oldPath))
-                    File.Delete(oldPath);
+                // Robust cleanup with retries
+                for (int i = 0; i < 10; i++)
+                {
+                    try { if (File.Exists(oldPath)) File.Delete(oldPath); break; }
+                    catch { Thread.Sleep(500); }
+                }
 
-                if (File.Exists(currentPath))
-                    File.Move(currentPath, oldPath);
+                for (int i = 0; i < 10; i++)
+                {
+                    try { if (File.Exists(currentPath)) File.Move(currentPath, oldPath); break; }
+                    catch { Thread.Sleep(500); }
+                }
 
-                if (File.Exists(newPath))
-                    File.Move(newPath, currentPath);
+                for (int i = 0; i < 10; i++)
+                {
+                    try { if (File.Exists(newPath)) File.Move(newPath, currentPath); break; }
+                    catch { Thread.Sleep(500); }
+                }
 
-                if (File.Exists(oldPath))
-                    File.Delete(oldPath);
+                // Cleanup old file with retries
+                for (int i = 0; i < 10; i++)
+                {
+                    try { if (File.Exists(oldPath)) File.Delete(oldPath); break; }
+                    catch { Thread.Sleep(500); }
+                }
 
                 Process.Start(currentPath);
             }
             catch { }
-finally
+            finally
             {
                 Environment.Exit(0);
             }
@@ -1199,6 +1213,7 @@ content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel
         }
     }
 }
+
 
 
 
