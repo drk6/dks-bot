@@ -240,11 +240,11 @@ namespace ENIApp
         {
             while (running)
             {
-                if (GetAsyncKeyState(circleHotkey) == -32767)
+                if (circleHotkey != 0 && GetAsyncKeyState(circleHotkey) == -32767)
                 {
                     try { this.Invoke(new Action(() => RunCircleDraw())); } catch { }
                 }
-                if (GetAsyncKeyState(squareHotkey) == -32767)
+                if (squareHotkey != 0 && GetAsyncKeyState(squareHotkey) == -32767)
                 {
                     try { this.Invoke(new Action(() => RunSquareDraw())); } catch { }
                 }
@@ -478,6 +478,19 @@ namespace ENIApp
             };
             setHotkeyBtn.FlatAppearance.BorderSize = 0;
 
+            var clearHotkeyBtn = new Button
+            {
+                Text = "Clear",
+                Location = new Point(335, y - 5),
+                Size = new Size(60, 32),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = hoverColor,
+                ForeColor = Color.FromArgb(160, 160, 170),
+                Font = new Font("Segoe UI", 10),
+                Cursor = Cursors.Hand
+            };
+            clearHotkeyBtn.FlatAppearance.BorderSize = 0;
+
             var waitLabel = MakeLabel("Wait (sec):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y + gap);
             var waitBox = new TextBox
             {
@@ -557,6 +570,12 @@ namespace ENIApp
                 t.Start();
             };
 
+            clearHotkeyBtn.Click += (s, e) =>
+            {
+                circleHotkey = 0;
+                hotkeyBox.Text = "None";
+            };
+
             startBtn.Click += (s, e) =>
             {
                 double waitSec = 1.5;
@@ -605,7 +624,7 @@ namespace ENIApp
                 statusLabel.Text = "Circle drawn!";
             };
 
-            content.Controls.AddRange(new Control[] { title, sub, hotkeyLabel, hotkeyBox, setHotkeyBtn, waitLabel, waitBox, speedLabel, speedBox, radiusLabel, radiusBox, startBtn, statusLabel });
+            content.Controls.AddRange(new Control[] { title, sub, hotkeyLabel, hotkeyBox, setHotkeyBtn, clearHotkeyBtn, waitLabel, waitBox, speedLabel, speedBox, radiusLabel, radiusBox, startBtn, statusLabel });
         }
 
         private void ShowSquare()
@@ -641,6 +660,19 @@ namespace ENIApp
                 Cursor = Cursors.Hand
             };
             setHotkeyBtn.FlatAppearance.BorderSize = 0;
+
+            var clearHotkeyBtn = new Button
+            {
+                Text = "Clear",
+                Location = new Point(335, y - 5),
+                Size = new Size(60, 32),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = hoverColor,
+                ForeColor = Color.FromArgb(160, 160, 170),
+                Font = new Font("Segoe UI", 10),
+                Cursor = Cursors.Hand
+            };
+            clearHotkeyBtn.FlatAppearance.BorderSize = 0;
 
             var waitLabel = MakeLabel("Wait (sec):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y + gap);
             var waitBox = new TextBox
@@ -721,6 +753,12 @@ namespace ENIApp
                 t.Start();
             };
 
+            clearHotkeyBtn.Click += (s, e) =>
+            {
+                squareHotkey = 0;
+                hotkeyBox.Text = "None";
+            };
+
             startBtn.Click += (s, e) =>
             {
                 double waitSec = 1.5;
@@ -788,7 +826,7 @@ namespace ENIApp
                 statusLabel.Text = "Square drawn!";
             };
 
-            content.Controls.AddRange(new Control[] { title, sub, hotkeyLabel, hotkeyBox, setHotkeyBtn, waitLabel, waitBox, speedLabel, speedBox, sizeLabel, sizeBox, startBtn, statusLabel });
+            content.Controls.AddRange(new Control[] { title, sub, hotkeyLabel, hotkeyBox, setHotkeyBtn, clearHotkeyBtn, waitLabel, waitBox, speedLabel, speedBox, sizeLabel, sizeBox, startBtn, statusLabel });
         }
 
         private void ShowSettings()
