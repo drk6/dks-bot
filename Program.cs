@@ -821,29 +821,21 @@ namespace ENIApp
                         try
                         {
                             string ghPath = "C:\\Program Files\\GitHub CLI\\gh.exe";
-                            if (!File.Exists(ghPath))
-                            {
-                                string[] paths = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles).Split('\\');
-                                string programFiles = string.Join("\\", paths);
-                                ghPath = Path.Combine(programFiles, "GitHub CLI", "gh.exe");
-                            }
-                            if (!File.Exists(ghPath))
-                            {
-                                ghPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GitHub CLI", "gh.exe");
-                            }
 
                             Process ghProcess = new Process();
-                            ghProcess.StartInfo.FileName = ghPath;
-                            ghProcess.StartInfo.Arguments = "auth login --hostname github.com --git-protocol https --web";
+                            ghProcess.StartInfo.FileName = "cmd.exe";
+                            ghProcess.StartInfo.Arguments = "/c \"" + ghPath + "\" auth login --hostname github.com --git-protocol https --web";
                             ghProcess.StartInfo.UseShellExecute = true;
                             ghProcess.Start();
                             ghProcess.WaitForExit(120000);
 
                             if (ghProcess.ExitCode == 0)
                             {
+                                System.Threading.Thread.Sleep(2000);
+
                                 Process tokenProcess = new Process();
-                                tokenProcess.StartInfo.FileName = ghPath;
-                                tokenProcess.StartInfo.Arguments = "auth token --hostname github.com";
+                                tokenProcess.StartInfo.FileName = "cmd.exe";
+                                tokenProcess.StartInfo.Arguments = "/c \"" + ghPath + "\" auth token --hostname github.com";
                                 tokenProcess.StartInfo.UseShellExecute = false;
                                 tokenProcess.StartInfo.RedirectStandardOutput = true;
                                 tokenProcess.StartInfo.CreateNoWindow = true;
