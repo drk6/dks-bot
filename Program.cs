@@ -21,8 +21,18 @@ namespace ENIApp
         public static string CurrentVersion = "1.0.12";
 
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            // Handle --install-update flag for Discord-style self-update
+            if (args.Length > 0 && args[0] == "--install-update")
+            {
+                string currentPath = Assembly.GetExecutingAssembly().Location;
+                if (string.IsNullOrEmpty(currentPath))
+                    currentPath = Process.GetCurrentProcess().MainModule.FileName;
+                InstallUpdateAndRestart(currentPath);
+                return;
+            }
+
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -34,22 +44,15 @@ namespace ENIApp
             string mainExe = Path.Combine(dir, "app.exe");
             string newExe = Path.Combine(dir, "app_new.exe");
 
-            if (Path.GetFileName(myPath).ToLower() == "app_new.exe")
-            {
-                try { if (File.Exists(mainExe)) File.Delete(mainExe); } catch { }
-                try { File.Move(myPath, mainExe); } catch { }
-                try { Process.Start(mainExe); } catch { }
-                Environment.Exit(0);
-                return;
-            }
-
+            // Clean up any leftover temp files from previous failed updates
             try
             {
                 if (File.Exists(newExe)) File.Delete(newExe);
                 string oldFile = Path.Combine(dir, "app.old.exe");
                 string vbsFile = Path.Combine(dir, "update.vbs");
                 if (File.Exists(oldFile)) File.Delete(oldFile);
-                if (File.Exists(vbsFile)) File.Delete(vbsFile);
+                string vbsFile2 = Path.Combine(dir, "update.bat");
+                if (File.Exists(vbsFile2)) File.Delete(vbsFile2);
             }
             catch { }
 
@@ -82,7 +85,7 @@ namespace ENIApp
                     {
                         if (forceUpdate)
                         {
-                            DownloadUpdate();
+                            DownloadAndInstallUpdate();
                             return true;
                         }
                         // force=false: silently ignore, no prompt
@@ -94,7 +97,7 @@ namespace ENIApp
             return false;
         }
 
-        public static void DownloadUpdate()
+        public static void DownloadAndInstallUpdate()
         {
             try
             {
@@ -117,13 +120,51 @@ namespace ENIApp
 
                     File.WriteAllBytes(newPath, exeBytes);
 
-                    Process.Start(newPath);
+                    // Launch self with --install-update flag, then exit
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = Assembly.GetExecutingAssembly().Location,
+                        Arguments = "--install-update",
+                        UseShellExecute = true
+                    });
                     Environment.Exit(0);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Update failed: " + ex.Message, "ENI Updater", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Update download failed: " + ex.Message, "ENI Updater", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        public static void InstallUpdateAndRestart(string currentPath)
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(currentPath);
+                string newPath = Path.Combine(dir, "app_new.exe");
+                string oldPath = Path.Combine(dir, "app_old.exe");
+
+                // Wait for old process to fully exit
+                Thread.Sleep(2000);
+
+                if (File.Exists(oldPath))
+                    File.Delete(oldPath);
+
+                if (File.Exists(currentPath))
+                    File.Move(currentPath, oldPath);
+
+                if (File.Exists(newPath))
+                    File.Move(newPath, currentPath);
+
+                if (File.Exists(oldPath))
+                    File.Delete(oldPath);
+
+                Process.Start(currentPath);
+            }
+            catch { }
+finally
+            {
+                Environment.Exit(0);
             }
         }
 
@@ -343,7 +384,7 @@ namespace ENIApp
                         {
                             if (forceUpdate)
                             {
-                                try { this.Invoke(new Action(() => { Program.DownloadUpdate(); })); } catch { }
+                                try { this.Invoke(new Action(() => { Program.DownloadAndInstallUpdate(); })); } catch { }
                             }
                             // force=false: silently ignore
                         }
@@ -1151,8 +1192,14 @@ content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel
         {
             return new Label { Text = text, Font = new Font("Segoe UI", size, style), ForeColor = color, Location = new Point(x, y), AutoSize = true, BackColor = Color.Transparent };
         }
+
+        public static object ParseJson(string json)
+        {
+            return new System.Web.Script.Serialization.JavaScriptSerializer().DeserializeObject(json);
+        }
     }
 }
+
 
 
 
