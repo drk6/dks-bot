@@ -86,31 +86,29 @@ namespace ENIApp
 
                     string currentPath = Assembly.GetExecutingAssembly().Location;
                     string dir = Path.GetDirectoryName(currentPath);
-                    string tempPath = Path.Combine(dir, "app.new.exe");
-                    string oldPath = Path.Combine(dir, "app.old.exe");
+                    string newPath = Path.Combine(dir, "app.exe.new");
                     string batPath = Path.Combine(dir, "update.bat");
 
-                    File.WriteAllBytes(tempPath, exeBytes);
+                    File.WriteAllBytes(newPath, exeBytes);
 
                     string bat = "@echo off\r\n" +
-                        "timeout /t 2 /nobreak >nul\r\n" +
-                        "del /f /q \"" + oldPath + "\"\r\n" +
-                        "move /y \"" + currentPath + "\" \"" + oldPath + "\"\r\n" +
-                        "move /y \"" + tempPath + "\" \"" + currentPath + "\"\r\n" +
-                        "del /f /q \"" + oldPath + "\"\r\n" +
-                        "del /f /q \"" + batPath + "\"\r\n" +
-                        "start \"\" \"" + currentPath + "\"\r\n";
+                        "timeout /t 3 /nobreak >nul\r\n" +
+                        "del /f /q \"" + currentPath + "\"\r\n" +
+                        "ren \"" + newPath + "\" \"app.exe\"\r\n" +
+                        "start \"\" \"" + currentPath + "\"\r\n" +
+                        "del /f /q \"" + batPath + "\"\r\n";
 
                     File.WriteAllText(batPath, bat);
 
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = batPath,
-                        WindowStyle = ProcessWindowStyle.Hidden,
-                        CreateNoWindow = true
-                    });
+                    ProcessStartInfo psi = new ProcessStartInfo();
+                    psi.FileName = "cmd.exe";
+                    psi.Arguments = "/c \"" + batPath + "\"";
+                    psi.WindowStyle = ProcessWindowStyle.Hidden;
+                    psi.CreateNoWindow = true;
+                    psi.UseShellExecute = true;
+                    Process.Start(psi);
 
-                    Thread.Sleep(500);
+                    Thread.Sleep(1000);
                     Environment.Exit(0);
                 }
             }
@@ -1135,5 +1133,6 @@ namespace ENIApp
         }
     }
 }
+
 
 
