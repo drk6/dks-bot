@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -85,19 +85,8 @@ namespace ENIApp
                             DownloadUpdate();
                             return true;
                         }
-
-                        DialogResult result = MessageBox.Show(
-                            "New version available: v" + latestVersion + "\n\nUpdate now?",
-                            "ENI Updater",
-                            MessageBoxButtons.YesNo,
-                            MessageBoxIcon.Information
-                        );
-
-                        if (result == DialogResult.Yes)
-                        {
-                            DownloadUpdate();
-                            return true;
-                        }
+                        // force=false: silently ignore, no prompt
+                        return false;
                     }
                 }
             }
@@ -356,14 +345,7 @@ namespace ENIApp
                             {
                                 try { this.Invoke(new Action(() => { Program.DownloadUpdate(); })); } catch { }
                             }
-                            else
-                            {
-                                DialogResult r = MessageBox.Show("New version v" + latest + " available. Update now?", "Auto Update", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-                                if (r == DialogResult.Yes)
-                                {
-                                    try { this.Invoke(new Action(() => { Program.DownloadUpdate(); })); } catch { }
-                                }
-                            }
+                            // force=false: silently ignore
                         }
                     }
                 }
@@ -1171,6 +1153,7 @@ content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel
         }
     }
 }
+
 
 
 
