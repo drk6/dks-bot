@@ -97,33 +97,16 @@ namespace ENIApp
                     string dir = Path.GetDirectoryName(currentPath);
                     string newPath = Path.Combine(dir, "app.new.exe");
                     string oldPath = Path.Combine(dir, "app.old.exe");
-                    string batPath = Path.Combine(dir, "update.bat");
 
                     File.WriteAllBytes(newPath, exeBytes);
 
-                    string bat = "@echo off\r\n" +
-                        ":wait\r\n" +
-                        "tasklist /FI \"IMAGENAME eq app.exe\" | find /i \"app.exe\" >nul\r\n" +
-                        "if not errorlevel 1 (\r\n" +
-                        "  timeout /t 1 /nobreak >nul\r\n" +
-                        "  goto wait\r\n" +
-                        ")\r\n" +
-                        "del /f /q \"" + oldPath + "\" 2>nul\r\n" +
-                        "ren \"" + currentPath + "\" \"app.old.exe\" 2>nul\r\n" +
-                        "ren \"" + newPath + "\" \"app.exe\"\r\n" +
-                        "start \"\" \"" + currentPath + "\"\r\n" +
-                        "del /f /q \"" + batPath + "\" 2>nul\r\n";
+                    if (File.Exists(oldPath))
+                        File.Delete(oldPath);
 
-                    File.WriteAllText(batPath, bat);
+                    File.Move(currentPath, oldPath);
+                    File.Move(newPath, currentPath);
 
-                    ProcessStartInfo psi = new ProcessStartInfo();
-                    psi.FileName = batPath;
-                    psi.WindowStyle = ProcessWindowStyle.Hidden;
-                    psi.CreateNoWindow = true;
-                    psi.UseShellExecute = true;
-                    Process.Start(psi);
-
-                    Thread.Sleep(500);
+                    Process.Start(currentPath);
                     Environment.Exit(0);
                 }
             }
@@ -1148,6 +1131,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
