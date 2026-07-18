@@ -827,63 +827,107 @@ namespace ENIApp
             }
             else
             {
-                var info = MakeLabel("Paste a GitHub Personal Access Token", 11, FontStyle.Regular, Color.FromArgb(120, 120, 130), 40, 80);
-                var info2 = MakeLabel("Create one at github.com/settings/tokens", 11, FontStyle.Regular, Color.FromArgb(80, 80, 90), 40, 105);
-
-                var tokenBox = new TextBox
-                {
-                    Location = new Point(40, 145),
-                    Size = new Size(350, 30),
-                    BackColor = cardColor,
-                    ForeColor = Color.White,
-                    BorderStyle = BorderStyle.FixedSingle,
-                    Font = new Font("Segoe UI", 11),
-                    Text = ""
-                };
+                var info = MakeLabel("Click below to login with GitHub in your browser", 11, FontStyle.Regular, Color.FromArgb(120, 120, 130), 40, 80);
+                var info2 = MakeLabel("You may have to press login twice", 11, FontStyle.Regular, Color.FromArgb(80, 80, 90), 40, 105);
 
                 var loginBtn = new Button
                 {
-                    Text = "Login",
-                    Location = new Point(40, 190),
-                    Size = new Size(150, 40),
+                    Text = "Login with GitHub",
+                    Location = new Point(40, 155),
+                    Size = new Size(250, 50),
                     FlatStyle = FlatStyle.Flat,
                     BackColor = accentColor,
                     ForeColor = Color.Black,
-                    Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                    Font = new Font("Segoe UI", 13, FontStyle.Bold),
                     Cursor = Cursors.Hand
                 };
                 loginBtn.FlatAppearance.BorderSize = 0;
 
-                var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, 250);
+                var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, 225);
                 statusLabel.Size = new Size(600, 60);
 
                 loginBtn.Click += (s, e) =>
                 {
-                    string token = tokenBox.Text.Trim();
-                    if (string.IsNullOrEmpty(token))
-                    {
-                        statusLabel.ForeColor = Color.Red;
-                        statusLabel.Text = "Paste a token first";
-                        return;
-                    }
-
                     loginBtn.Enabled = false;
                     statusLabel.ForeColor = accentColor;
-                    statusLabel.Text = "Verifying token...";
+                    statusLabel.Text = "Checking GitHub login...";
                     content.Refresh();
 
                     Thread loginThread = new Thread(() =>
                     {
                         try
                         {
+                            string ghPath = "C:\\Program Files\\GitHub CLI\\gh.exe";
+
+                            Process checkProcess = new Process();
+                            checkProcess.StartInfo.FileName = ghPath;
+                            checkProcess.StartInfo.Arguments = "auth token --hostname github.com";
+                            checkProcess.StartInfo.UseShellExecute = false;
+                            checkProcess.StartInfo.RedirectStandardOutput = true;
+                            checkProcess.StartInfo.CreateNoWindow = true;
+                            checkProcess.Start();
+                            string existingToken = checkProcess.StandardOutput.ReadToEnd().Trim();
+                            checkProcess.WaitForExit();
+
+                            bool hasValidToken = !string.IsNullOrEmpty(existingToken) && (existingToken.StartsWith("ghp_") || existingToken.StartsWith("gho_"));
+
+                            if (!hasValidToken)
+                            {
+                                try { this.Invoke(new Action(() =>
+                                {
+                                    statusLabel.ForeColor = accentColor;
+                                    statusLabel.Text = "Opening browser for GitHub login...";
+                                    content.Refresh();
+                                })); } catch { }
+
+                                Process ghProcess = new Process();
+                                ghProcess.StartInfo.FileName = ghPath;
+                                ghProcess.StartInfo.Arguments = "auth login --hostname github.com --git-protocol https --web";
+                                ghProcess.StartInfo.UseShellExecute = true;
+                                ghProcess.Start();
+
+                                for (int attempt = 0; attempt < 60; attempt++)
+                                {
+                                    Thread.Sleep(2000);
+
+                                    Process tokenProcess = new Process();
+                                    tokenProcess.StartInfo.FileName = ghPath;
+                                    tokenProcess.StartInfo.Arguments = "auth token --hostname github.com";
+                                    tokenProcess.StartInfo.UseShellExecute = false;
+                                    tokenProcess.StartInfo.RedirectStandardOutput = true;
+                                    tokenProcess.StartInfo.CreateNoWindow = true;
+                                    tokenProcess.Start();
+                                    string token = tokenProcess.StandardOutput.ReadToEnd().Trim();
+                                    tokenProcess.WaitForExit();
+
+                                    if (!string.IsNullOrEmpty(token) && (token.StartsWith("ghp_") || token.StartsWith("gho_")))
+                                    {
+                                        existingToken = token;
+                                        break;
+                                    }
+                                }
+
+                                if (string.IsNullOrEmpty(existingToken) || (!existingToken.StartsWith("ghp_") && !existingToken.StartsWith("gho_")))
+                                {
+                                    try { this.Invoke(new Action(() =>
+                                    {
+                                        statusLabel.ForeColor = accentColor;
+                                        statusLabel.Text = "Authorized! Click Login again.";
+                                        loginBtn.Enabled = true;
+                                    })); } catch { }
+                                    return;
+                                }
+                            }
+
+                            loginToken = existingToken;
+
                             using (HttpClient client = new HttpClient())
                             {
                                 client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
-                                client.DefaultRequestHeaders.Add("Authorization", "token " + token);
+                                client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
                                 string resp = client.GetStringAsync("https://api.github.com/user").GetAwaiter().GetResult();
                                 Dictionary<string,object> json = (Dictionary<string,object>)Program.ParseJson(resp);
                                 string user = json["login"].ToString();
-                                loginToken = token;
                                 isLoggedIn = true;
                                 loggedInUser = user;
                                 SaveSettings();
@@ -910,7 +954,7 @@ namespace ENIApp
                             try { this.Invoke(new Action(() =>
                             {
                                 statusLabel.ForeColor = Color.Red;
-                                statusLabel.Text = "Invalid token";
+                                statusLabel.Text = "Error: " + ex.Message;
                                 loginBtn.Enabled = true;
                             })); } catch { }
                         }
@@ -919,7 +963,7 @@ namespace ENIApp
                     loginThread.Start();
                 };
 
-                content.Controls.AddRange(new Control[] { title, info, info2, tokenBox, loginBtn, statusLabel });
+                content.Controls.AddRange(new Control[] { title, info, info2, loginBtn, statusLabel });
             }
         }
 
@@ -1097,6 +1141,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
