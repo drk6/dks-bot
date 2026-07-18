@@ -18,7 +18,7 @@ namespace ENIApp
         public static string GitHubUser = "drk6";
         public static string GitHubRepo = ".exe-app";
         public static string GitHubToken = "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";
-        public static string CurrentVersion = "1.0.10";
+        public static string CurrentVersion = "1.0.11";
 
         [STAThread]
         static void Main()
@@ -1279,6 +1279,7 @@ uploadBtn.Click += (s, e) =>
         }
     }
 }
+
 
 
 
