@@ -41,11 +41,12 @@ namespace ENIApp
                 {
                     client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
                     client.DefaultRequestHeaders.Add("Authorization", "token " + GitHubToken);
+                    client.Timeout = TimeSpan.FromSeconds(15);
 
                     string versionUrl = "https://api.github.com/repos/" + GitHubUser + "/" + GitHubRepo + "/contents/version.txt";
                     string versionResp = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
-                    dynamic versionJson = ParseJson(versionResp);
-                    string latestVersion = Encoding.UTF8.GetString(Convert.FromBase64String(((Dictionary<string,object>)versionJson)["content"].ToString().Replace("\n", ""))).Trim();
+                    Dictionary<string,object> versionJson = (Dictionary<string,object>)ParseJson(versionResp);
+                    string latestVersion = Encoding.UTF8.GetString(Convert.FromBase64String(versionJson["content"].ToString().Replace("\n", ""))).Trim();
 
                     if (latestVersion != CurrentVersion)
                     {
@@ -76,23 +77,27 @@ namespace ENIApp
                 {
                     client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
                     client.DefaultRequestHeaders.Add("Authorization", "token " + GitHubToken);
+                    client.Timeout = TimeSpan.FromMinutes(5);
 
                     string exeUrl = "https://api.github.com/repos/" + GitHubUser + "/" + GitHubRepo + "/contents/app.exe";
                     string exeResp = client.GetStringAsync(exeUrl).GetAwaiter().GetResult();
-                    dynamic exeJson = ParseJson(exeResp);
-                    byte[] exeBytes = Convert.FromBase64String(((Dictionary<string,object>)exeJson)["content"].ToString().Replace("\n", ""));
+                    Dictionary<string,object> exeJson = (Dictionary<string,object>)ParseJson(exeResp);
+                    byte[] exeBytes = Convert.FromBase64String(exeJson["content"].ToString().Replace("\n", ""));
 
                     string currentPath = Assembly.GetExecutingAssembly().Location;
-                    string tempPath = currentPath + ".new";
                     string dir = Path.GetDirectoryName(currentPath);
+                    string tempPath = Path.Combine(dir, "app.new.exe");
+                    string oldPath = Path.Combine(dir, "app.old.exe");
                     string batPath = Path.Combine(dir, "update.bat");
 
                     File.WriteAllBytes(tempPath, exeBytes);
 
                     string bat = "@echo off\r\n" +
-                        "timeout /t 1 /nobreak >nul\r\n" +
-                        "del /f /q \"" + currentPath + "\"\r\n" +
-                        "rename \"" + tempPath + "\" \"" + Path.GetFileName(currentPath) + "\"\r\n" +
+                        "timeout /t 2 /nobreak >nul\r\n" +
+                        "del /f /q \"" + oldPath + "\"\r\n" +
+                        "move /y \"" + currentPath + "\" \"" + oldPath + "\"\r\n" +
+                        "move /y \"" + tempPath + "\" \"" + currentPath + "\"\r\n" +
+                        "del /f /q \"" + oldPath + "\"\r\n" +
                         "del /f /q \"" + batPath + "\"\r\n" +
                         "start \"\" \"" + currentPath + "\"\r\n";
 
@@ -105,6 +110,7 @@ namespace ENIApp
                         CreateNoWindow = true
                     });
 
+                    Thread.Sleep(500);
                     Environment.Exit(0);
                 }
             }
@@ -1129,4 +1135,5 @@ namespace ENIApp
         }
     }
 }
+
 
