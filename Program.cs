@@ -463,34 +463,27 @@ namespace ENIApp
                 ForeColor = accentColor,
                 BorderStyle = BorderStyle.FixedSingle,
                 Font = new Font("Segoe UI", 11),
-                Text = "P",
-                ReadOnly = true
+                Text = "P"
             };
 
-            hotkeyBox.GotFocus += (s, e) =>
+            hotkeyBox.Enter += (s, e) =>
             {
-                hotkeyBox.Text = "Press a key...";
-                hotkeyListening = true;
-                Thread t = new Thread(() =>
+                hotkeyBox.SelectAll();
+            };
+
+            hotkeyBox.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode != Keys.None && e.KeyCode != Keys.ShiftKey && e.KeyCode != Keys.ControlKey && e.KeyCode != Keys.Menu)
                 {
-                    while (hotkeyListening)
-                    {
-                        for (int i = 1; i < 256; i++)
-                        {
-                            if (GetAsyncKeyState(i) == -32767)
-                            {
-                                circlePendingKey = i;
-                                Keys k = (Keys)i;
-                                string name = k.ToString();
-                                try { this.Invoke(new Action(() => { hotkeyBox.Text = name; hotkeyListening = false; })); } catch { }
-                                return;
-                            }
-                        }
-                        Thread.Sleep(10);
-                    }
-                });
-                t.IsBackground = true;
-                t.Start();
+                    circlePendingKey = (int)e.KeyCode;
+                    hotkeyBox.Text = e.KeyCode.ToString();
+                    e.SuppressKeyPress = true;
+                }
+            };
+
+            hotkeyBox.KeyPress += (s, e) =>
+            {
+                e.Handled = true;
             };
 
             var setHotkeyBtn = new Button
@@ -651,34 +644,27 @@ namespace ENIApp
                 ForeColor = accentColor,
                 BorderStyle = BorderStyle.FixedSingle,
                 Font = new Font("Segoe UI", 11),
-                Text = "O",
-                ReadOnly = true
+                Text = "O"
             };
 
-            hotkeyBox.GotFocus += (s, e) =>
+            hotkeyBox.Enter += (s, e) =>
             {
-                hotkeyBox.Text = "Press a key...";
-                hotkeyListening = true;
-                Thread t = new Thread(() =>
+                hotkeyBox.SelectAll();
+            };
+
+            hotkeyBox.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode != Keys.None && e.KeyCode != Keys.ShiftKey && e.KeyCode != Keys.ControlKey && e.KeyCode != Keys.Menu)
                 {
-                    while (hotkeyListening)
-                    {
-                        for (int i = 1; i < 256; i++)
-                        {
-                            if (GetAsyncKeyState(i) == -32767)
-                            {
-                                squarePendingKey = i;
-                                Keys k = (Keys)i;
-                                string name = k.ToString();
-                                try { this.Invoke(new Action(() => { hotkeyBox.Text = name; hotkeyListening = false; })); } catch { }
-                                return;
-                            }
-                        }
-                        Thread.Sleep(10);
-                    }
-                });
-                t.IsBackground = true;
-                t.Start();
+                    squarePendingKey = (int)e.KeyCode;
+                    hotkeyBox.Text = e.KeyCode.ToString();
+                    e.SuppressKeyPress = true;
+                }
+            };
+
+            hotkeyBox.KeyPress += (s, e) =>
+            {
+                e.Handled = true;
             };
 
             var setHotkeyBtn = new Button
