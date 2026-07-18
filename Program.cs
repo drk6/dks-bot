@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -45,7 +45,7 @@ namespace ENIApp
                     string versionUrl = "https://api.github.com/repos/" + GitHubUser + "/" + GitHubRepo + "/contents/version.txt";
                     string versionResp = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
                     dynamic versionJson = ParseJson(versionResp);
-                    string latestVersion = Encoding.UTF8.GetString(Convert.FromBase64String(versionJson.content.ToString().Replace("\n", ""))).Trim();
+                    string latestVersion = Encoding.UTF8.GetString(Convert.FromBase64String(((Dictionary<string,object>)versionJson)["content"].ToString().Replace("\n", ""))).Trim();
 
                     if (latestVersion != CurrentVersion)
                     {
@@ -80,7 +80,7 @@ namespace ENIApp
                     string exeUrl = "https://api.github.com/repos/" + GitHubUser + "/" + GitHubRepo + "/contents/app.exe";
                     string exeResp = client.GetStringAsync(exeUrl).GetAwaiter().GetResult();
                     dynamic exeJson = ParseJson(exeResp);
-                    byte[] exeBytes = Convert.FromBase64String(exeJson.content.ToString().Replace("\n", ""));
+                    byte[] exeBytes = Convert.FromBase64String(((Dictionary<string,object>)exeJson)["content"].ToString().Replace("\n", ""));
 
                     string currentPath = Assembly.GetExecutingAssembly().Location;
                     string tempPath = currentPath + ".new";
@@ -318,7 +318,7 @@ namespace ENIApp
                         string url = "https://api.github.com/repos/" + Program.GitHubUser + "/" + Program.GitHubRepo + "/contents/version.txt";
                         string resp = client.GetStringAsync(url).GetAwaiter().GetResult();
                         dynamic json = Program.ParseJson(resp);
-                        string latest = Encoding.UTF8.GetString(Convert.FromBase64String(json.content.ToString().Replace("\n", ""))).Trim();
+                        string latest = Encoding.UTF8.GetString(Convert.FromBase64String(((Dictionary<string,object>)json)["content"].ToString().Replace("\n", ""))).Trim();
                         if (latest != Program.CurrentVersion)
                         {
                             DialogResult r = MessageBox.Show("New version v" + latest + " available. Update now?", "Auto Update", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
@@ -343,7 +343,7 @@ namespace ENIApp
                     client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
                     string resp = client.GetStringAsync("https://api.github.com/user").GetAwaiter().GetResult();
                     dynamic json = Program.ParseJson(resp);
-                    string user = json.login.ToString();
+                                string user = ((Dictionary<string,object>)json)["login"].ToString();
                     if (user == "drk6")
                     {
                         isLoggedIn = true;
@@ -915,7 +915,7 @@ namespace ENIApp
                                 client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
                                 string resp = client.GetStringAsync("https://api.github.com/user").GetAwaiter().GetResult();
                                 dynamic json = Program.ParseJson(resp);
-                                string user = json.login.ToString();
+                    string user = ((Dictionary<string,object>)json)["login"].ToString();
                                 isLoggedIn = true;
                                 loggedInUser = user;
                                 SaveSettings();
@@ -1019,7 +1019,7 @@ namespace ENIApp
                         string versionUrl = "https://api.github.com/repos/" + Program.GitHubUser + "/" + Program.GitHubRepo + "/contents/version.txt";
                         string getResp = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
                         dynamic getVersionJson = Program.ParseJson(getResp);
-                        string currentSha = getVersionJson.sha.ToString();
+                        string currentSha = ((Dictionary<string,object>)getVersionJson)["sha"].ToString();
 
                         string encodedVersion = Convert.ToBase64String(Encoding.UTF8.GetBytes(newVersion + "\r\n"));
 
@@ -1081,7 +1081,7 @@ namespace ENIApp
                             string exeUrl = "https://api.github.com/repos/" + Program.GitHubUser + "/" + Program.GitHubRepo + "/contents/app.exe";
                             string getResp = client.GetStringAsync(exeUrl).GetAwaiter().GetResult();
                             dynamic getJson = Program.ParseJson(getResp);
-                            string currentSha = getJson.sha.ToString();
+                            string currentSha = ((Dictionary<string,object>)getJson)["sha"].ToString();
 
                             byte[] exeBytes = File.ReadAllBytes(ofd.FileName);
                             string encodedExe = Convert.ToBase64String(exeBytes);
@@ -1129,3 +1129,4 @@ namespace ENIApp
         }
     }
 }
+
