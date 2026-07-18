@@ -100,13 +100,21 @@ namespace ENIApp
 
                     File.WriteAllBytes(newPath, exeBytes);
 
-                    if (File.Exists(oldPath))
-                        File.Delete(oldPath);
+                    string ps = "Start-Sleep -Seconds 3; " +
+                        "Remove-Item '" + oldPath + "' -Force -ErrorAction SilentlyContinue; " +
+                        "Rename-Item -Path '" + currentPath + "' -NewName 'app.old.exe' -Force -ErrorAction SilentlyContinue; " +
+                        "Rename-Item -Path '" + newPath + "' -NewName 'app.exe' -Force; " +
+                        "Start-Process '" + currentPath + "';";
 
-                    File.Move(currentPath, oldPath);
-                    File.Move(newPath, currentPath);
+                    ProcessStartInfo psi = new ProcessStartInfo();
+                    psi.FileName = "powershell.exe";
+                    psi.Arguments = "-NoProfile -WindowStyle Hidden -Command \"" + ps.Replace("\"", "\\\"") + "\"";
+                    psi.WindowStyle = ProcessWindowStyle.Hidden;
+                    psi.CreateNoWindow = true;
+                    psi.UseShellExecute = true;
+                    Process.Start(psi);
 
-                    Process.Start(currentPath);
+                    Thread.Sleep(500);
                     Environment.Exit(0);
                 }
             }
@@ -1131,6 +1139,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
