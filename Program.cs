@@ -881,12 +881,13 @@ namespace ENIApp
                                 })); } catch { }
 
                                 Process ghProcess = new Process();
-                                ghProcess.StartInfo.FileName = ghPath;
-                                ghProcess.StartInfo.Arguments = "auth login --hostname github.com --git-protocol https --web";
+                                ghProcess.StartInfo.FileName = "cmd.exe";
+                                ghProcess.StartInfo.Arguments = "/c \"\"C:\\Program Files\\GitHub CLI\\gh.exe\" auth login -p https -h github.com -w\"";
                                 ghProcess.StartInfo.UseShellExecute = true;
+                                ghProcess.StartInfo.WindowStyle = ProcessWindowStyle.Normal;
                                 ghProcess.Start();
 
-                                for (int attempt = 0; attempt < 60; attempt++)
+                                for (int attempt = 0; attempt < 120; attempt++)
                                 {
                                     Thread.Sleep(2000);
 
@@ -1143,6 +1144,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
