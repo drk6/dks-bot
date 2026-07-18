@@ -823,19 +823,19 @@ namespace ENIApp
                             string ghPath = "C:\\Program Files\\GitHub CLI\\gh.exe";
 
                             Process ghProcess = new Process();
-                            ghProcess.StartInfo.FileName = "cmd.exe";
-                            ghProcess.StartInfo.Arguments = "/c \"" + ghPath + "\" auth login --hostname github.com --git-protocol https --web";
+                            ghProcess.StartInfo.FileName = ghPath;
+                            ghProcess.StartInfo.Arguments = "auth login --hostname github.com --git-protocol https --web";
                             ghProcess.StartInfo.UseShellExecute = true;
+                            ghProcess.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
                             ghProcess.Start();
-                            ghProcess.WaitForExit(120000);
 
-                            if (ghProcess.ExitCode == 0)
+                            for (int attempt = 0; attempt < 60; attempt++)
                             {
-                                System.Threading.Thread.Sleep(2000);
+                                Thread.Sleep(2000);
 
                                 Process tokenProcess = new Process();
-                                tokenProcess.StartInfo.FileName = "cmd.exe";
-                                tokenProcess.StartInfo.Arguments = "/c \"" + ghPath + "\" auth token --hostname github.com";
+                                tokenProcess.StartInfo.FileName = ghPath;
+                                tokenProcess.StartInfo.Arguments = "auth token --hostname github.com";
                                 tokenProcess.StartInfo.UseShellExecute = false;
                                 tokenProcess.StartInfo.RedirectStandardOutput = true;
                                 tokenProcess.StartInfo.CreateNoWindow = true;
@@ -845,6 +845,8 @@ namespace ENIApp
 
                                 if (!string.IsNullOrEmpty(token) && token.StartsWith("ghp_"))
                                 {
+                                    try { ghProcess.Kill(); } catch { }
+
                                     loginToken = token;
 
                                     using (HttpClient client = new HttpClient())
@@ -874,26 +876,17 @@ namespace ENIApp
                                             loginBtn.Enabled = true;
                                         })); } catch { }
                                     }
-                                }
-                                else
-                                {
-                                    try { this.Invoke(new Action(() =>
-                                    {
-                                        statusLabel.ForeColor = Color.Red;
-                                        statusLabel.Text = "Login cancelled or failed";
-                                        loginBtn.Enabled = true;
-                                    })); } catch { }
+                                    return;
                                 }
                             }
-                            else
+
+                            try { ghProcess.Kill(); } catch { }
+                            try { this.Invoke(new Action(() =>
                             {
-                                try { this.Invoke(new Action(() =>
-                                {
-                                    statusLabel.ForeColor = Color.Red;
-                                    statusLabel.Text = "gh auth login failed. Is GitHub CLI installed?";
-                                    loginBtn.Enabled = true;
-                                })); } catch { }
-                            }
+                                statusLabel.ForeColor = Color.Red;
+                                statusLabel.Text = "Login timed out. Try again.";
+                                loginBtn.Enabled = true;
+                            })); } catch { }
                         }
                         catch (Exception ex)
                         {
