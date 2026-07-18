@@ -449,7 +449,6 @@ namespace ENIApp
 
         private System.Windows.Forms.Timer slideTimer;
         private int slideTarget = 100;
-        private int slideSpeed = 0;
 
         private void HighlightButton(Button btn)
         {
@@ -492,7 +491,7 @@ namespace ENIApp
                 {
                     Button b = (Button)c;
                     string t = b.Text.ToLower();
-                    if (t == page || (page == "home" && b.Text == "Home") || (page == "dev" && b.Text == "Dev") || (page == "login" && b.Text == "Login"))
+                    if (t == page || t.Contains(page) || (page == "home" && b.Text == "Home") || (page == "dev" && b.Text == "Dev") || (page == "login" && b.Text == "Login"))
                     {
                         HighlightButton(b);
                         break;
@@ -856,7 +855,9 @@ namespace ENIApp
                             string existingToken = checkProcess.StandardOutput.ReadToEnd().Trim();
                             checkProcess.WaitForExit();
 
-                            if (string.IsNullOrEmpty(existingToken) || !existingToken.StartsWith("ghp_"))
+                            bool hasValidToken = !string.IsNullOrEmpty(existingToken) && (existingToken.StartsWith("ghp_") || existingToken.StartsWith("gho_"));
+
+                            if (!hasValidToken)
                             {
                                 try { this.Invoke(new Action(() =>
                                 {
@@ -885,7 +886,7 @@ namespace ENIApp
                                     string token = tokenProcess.StandardOutput.ReadToEnd().Trim();
                                     tokenProcess.WaitForExit();
 
-                                    if (!string.IsNullOrEmpty(token) && token.StartsWith("ghp_"))
+                                    if (!string.IsNullOrEmpty(token) && (token.StartsWith("ghp_") || token.StartsWith("gho_")))
                                     {
                                         existingToken = token;
                                         try { ghProcess.Kill(); } catch { }
@@ -893,7 +894,7 @@ namespace ENIApp
                                     }
                                 }
 
-                                if (string.IsNullOrEmpty(existingToken) || !existingToken.StartsWith("ghp_"))
+                            if (!hasValidToken)
                                 {
                                     try { ghProcess.Kill(); } catch { }
                                     try { this.Invoke(new Action(() =>
