@@ -770,6 +770,17 @@ namespace ENIApp
                     loggedInUser = "";
                     loginToken = "";
                     devButton.Visible = false;
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "gh",
+                            Arguments = "auth logout --hostname github.com",
+                            WindowStyle = ProcessWindowStyle.Hidden,
+                            CreateNoWindow = true
+                        });
+                    }
+                    catch { }
                     SaveSettings();
                     ShowPage("login");
                 };
@@ -778,79 +789,125 @@ namespace ENIApp
             }
             else
             {
-                var info = MakeLabel("Paste your GitHub token to login:", 11, FontStyle.Regular, Color.FromArgb(120, 120, 130), 40, 80);
-                var tokenBox = new TextBox
-                {
-                    Location = new Point(40, 115),
-                    Size = new Size(500, 30),
-                    BackColor = cardColor,
-                    ForeColor = Color.White,
-                    BorderStyle = BorderStyle.FixedSingle,
-                    Font = new Font("Segoe UI", 11)
-                };
+                var info = MakeLabel("Click below to login with GitHub in your browser", 11, FontStyle.Regular, Color.FromArgb(120, 120, 130), 40, 80);
+                var info2 = MakeLabel("No tokens needed - just click and authorize", 11, FontStyle.Regular, Color.FromArgb(80, 80, 90), 40, 105);
 
                 var loginBtn = new Button
                 {
-                    Text = "Login",
-                    Location = new Point(40, 160),
-                    Size = new Size(150, 40),
+                    Text = "Login with GitHub",
+                    Location = new Point(40, 155),
+                    Size = new Size(250, 50),
                     FlatStyle = FlatStyle.Flat,
                     BackColor = accentColor,
                     ForeColor = Color.Black,
-                    Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                    Font = new Font("Segoe UI", 13, FontStyle.Bold),
                     Cursor = Cursors.Hand
                 };
                 loginBtn.FlatAppearance.BorderSize = 0;
 
-                var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, 215);
-                statusLabel.Size = new Size(600, 30);
+                var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, 225);
+                statusLabel.Size = new Size(600, 60);
 
                 loginBtn.Click += (s, e) =>
                 {
-                    loginToken = tokenBox.Text.Trim();
-                    if (string.IsNullOrEmpty(loginToken))
-                    {
-                        statusLabel.ForeColor = Color.Red;
-                        statusLabel.Text = "Please enter a token";
-                        return;
-                    }
+                    loginBtn.Enabled = false;
                     statusLabel.ForeColor = accentColor;
-                    statusLabel.Text = "Logging in...";
+                    statusLabel.Text = "Opening browser for GitHub login...";
                     content.Refresh();
 
-                    try
+                    Thread loginThread = new Thread(() =>
                     {
-                        using (HttpClient client = new HttpClient())
+                        try
                         {
-                            client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
-                            client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
-                            string resp = client.GetStringAsync("https://api.github.com/user").GetAwaiter().GetResult();
-                            dynamic json = Program.ParseJson(resp);
-                            string user = json.login.ToString();
-                            isLoggedIn = true;
-                            loggedInUser = user;
-                            SaveSettings();
-                            if (user == "drk6")
+                            Process ghProcess = new Process();
+                            ghProcess.StartInfo.FileName = "gh";
+                            ghProcess.StartInfo.Arguments = "auth login --hostname github.com --git-protocol https --web";
+                            ghProcess.StartInfo.UseShellExecute = false;
+                            ghProcess.StartInfo.RedirectStandardOutput = true;
+                            ghProcess.StartInfo.RedirectStandardError = true;
+                            ghProcess.StartInfo.CreateNoWindow = true;
+                            ghProcess.Start();
+                            ghProcess.WaitForExit(120000);
+
+                            if (ghProcess.ExitCode == 0)
                             {
-                                devButton.Visible = true;
-                                statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
-                                statusLabel.Text = "Logged in as " + user + " (Dev)";
+                                Process tokenProcess = new Process();
+                                tokenProcess.StartInfo.FileName = "gh";
+                                tokenProcess.StartInfo.Arguments = "auth token --hostname github.com";
+                                tokenProcess.StartInfo.UseShellExecute = false;
+                                tokenProcess.StartInfo.RedirectStandardOutput = true;
+                                tokenProcess.StartInfo.CreateNoWindow = true;
+                                tokenProcess.Start();
+                                string token = tokenProcess.StandardOutput.ReadToEnd().Trim();
+                                tokenProcess.WaitForExit();
+
+                                if (!string.IsNullOrEmpty(token) && token.StartsWith("ghp_"))
+                                {
+                                    loginToken = token;
+
+                                    using (HttpClient client = new HttpClient())
+                                    {
+                                        client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
+                                        client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
+                                        string resp = client.GetStringAsync("https://api.github.com/user").GetAwaiter().GetResult();
+                                        dynamic json = Program.ParseJson(resp);
+                                        string user = json.login.ToString();
+                                        isLoggedIn = true;
+                                        loggedInUser = user;
+                                        SaveSettings();
+
+                                        try { this.Invoke(new Action(() =>
+                                        {
+                                            if (user == "drk6")
+                                            {
+                                                devButton.Visible = true;
+                                                statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
+                                                statusLabel.Text = "Logged in as " + user + " (Dev)";
+                                            }
+                                            else
+                                            {
+                                                statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
+                                                statusLabel.Text = "Logged in as " + user;
+                                            }
+                                            loginBtn.Enabled = true;
+                                        })); } catch { }
+                                    }
+                                }
+                                else
+                                {
+                                    try { this.Invoke(new Action(() =>
+                                    {
+                                        statusLabel.ForeColor = Color.Red;
+                                        statusLabel.Text = "Login cancelled or failed";
+                                        loginBtn.Enabled = true;
+                                    })); } catch { }
+                                }
                             }
                             else
                             {
-                                statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
-                                statusLabel.Text = "Logged in as " + user;
+                                try { this.Invoke(new Action(() =>
+                                {
+                                    statusLabel.ForeColor = Color.Red;
+                                    statusLabel.Text = "gh auth login failed. Is GitHub CLI installed?";
+                                    loginBtn.Enabled = true;
+                                })); } catch { }
                             }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        statusLabel.ForeColor = Color.Red;
-                        statusLabel.Text = "Login failed: " + ex.Message;
-                    }
+                        catch (Exception ex)
+                        {
+                            try { this.Invoke(new Action(() =>
+                            {
+                                statusLabel.ForeColor = Color.Red;
+                                statusLabel.Text = "Error: " + ex.Message;
+                                loginBtn.Enabled = true;
+                            })); } catch { }
+                        }
+                    });
+                    loginThread.IsBackground = true;
+                    loginThread.Start();
                 };
 
-                content.Controls.AddRange(new Control[] { title, info, tokenBox, loginBtn, statusLabel });
+                content.Controls.AddRange(new Control[] { title, info, info2, loginBtn, statusLabel });
             }
         }
 
