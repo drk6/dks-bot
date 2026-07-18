@@ -72,10 +72,20 @@ namespace ENIApp
                     string versionUrl = "https://api.github.com/repos/" + GitHubUser + "/" + GitHubRepo + "/contents/version.txt";
                     string versionResp = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
                     Dictionary<string,object> versionJson = (Dictionary<string,object>)ParseJson(versionResp);
-                    string latestVersion = Encoding.UTF8.GetString(Convert.FromBase64String(versionJson["content"].ToString().Replace("\n", ""))).Trim();
+                    string content = Encoding.UTF8.GetString(Convert.FromBase64String(versionJson["content"].ToString().Replace("\n", ""))).Trim();
+                    
+                    string[] parts = content.Split('|');
+                    string latestVersion = parts[0].Trim();
+                    bool forceUpdate = parts.Length > 1 && parts[1].Trim().ToLower() == "true";
 
                     if (latestVersion != CurrentVersion)
                     {
+                        if (forceUpdate)
+                        {
+                            DownloadUpdate();
+                            return true;
+                        }
+
                         DialogResult result = MessageBox.Show(
                             "New version available: v" + latestVersion + "\n\nUpdate now?",
                             "ENI Updater",
@@ -329,16 +339,30 @@ namespace ENIApp
                     {
                         client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
                         client.DefaultRequestHeaders.Add("Authorization", "token " + Program.GitHubToken);
+                        client.Timeout = TimeSpan.FromSeconds(15);
+
                         string url = "https://api.github.com/repos/" + Program.GitHubUser + "/" + Program.GitHubRepo + "/contents/version.txt";
                         string resp = client.GetStringAsync(url).GetAwaiter().GetResult();
-                        dynamic json = Program.ParseJson(resp);
-                        string latest = Encoding.UTF8.GetString(Convert.FromBase64String(((Dictionary<string,object>)json)["content"].ToString().Replace("\n", ""))).Trim();
+                        Dictionary<string,object> json = (Dictionary<string,object>)Program.ParseJson(resp);
+                        string content = Encoding.UTF8.GetString(Convert.FromBase64String(json["content"].ToString().Replace("\n", ""))).Trim();
+                        
+                        string[] parts = content.Split('|');
+                        string latest = parts[0].Trim();
+                        bool forceUpdate = parts.Length > 1 && parts[1].Trim().ToLower() == "true";
+
                         if (latest != Program.CurrentVersion)
                         {
-                            DialogResult r = MessageBox.Show("New version v" + latest + " available. Update now?", "Auto Update", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-                            if (r == DialogResult.Yes)
+                            if (forceUpdate)
                             {
                                 try { this.Invoke(new Action(() => { Program.DownloadUpdate(); })); } catch { }
+                            }
+                            else
+                            {
+                                DialogResult r = MessageBox.Show("New version v" + latest + " available. Update now?", "Auto Update", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                                if (r == DialogResult.Yes)
+                                {
+                                    try { this.Invoke(new Action(() => { Program.DownloadUpdate(); })); } catch { }
+                                }
                             }
                         }
                     }
@@ -1019,7 +1043,7 @@ namespace ENIApp
                 }
 
                 statusLabel.ForeColor = accentColor;
-                statusLabel.Text = "Pushing version " + newVersion + "...";
+                statusLabel.Text = "Pushing version " + newVersion + " (force=true)...";
                 content.Refresh();
 
                 try
@@ -1034,7 +1058,7 @@ namespace ENIApp
                         dynamic getVersionJson = Program.ParseJson(getResp);
                         string currentSha = ((Dictionary<string,object>)getVersionJson)["sha"].ToString();
 
-                        string encodedVersion = Convert.ToBase64String(Encoding.UTF8.GetBytes(newVersion + "\r\n"));
+                        string encodedVersion = Convert.ToBase64String(Encoding.UTF8.GetBytes(newVersion + "|true\r\n"));
 
                         string updateBody = "{\"message\":\"Force update to v" + newVersion + "\",\"content\":\"" + encodedVersion + "\",\"sha\":\"" + currentSha + "\"}";
 
@@ -1044,7 +1068,7 @@ namespace ENIApp
                         if (putResp.IsSuccessStatusCode)
                         {
                             statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
-                            statusLabel.Text = "Version bumped to " + newVersion + "!\r\nAll users will be prompted to update on next launch.";
+                            statusLabel.Text = "Version bumped to " + newVersion + " (FORCE UPDATE)!\r\nAll users will auto-update on next launch.";
                         }
                         else
                         {
@@ -1142,6 +1166,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
