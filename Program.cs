@@ -20,34 +20,29 @@ namespace AutoUpdater
 
         static async Task Run()
         {
-            Console.Title = "ENI Auto Updater";
+            Console.Title = "ENI App";
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("================================");
-            Console.WriteLine("   ENI Auto Updater v" + CurrentVersion);
+            Console.WriteLine("         ENI App v" + CurrentVersion);
             Console.WriteLine("================================");
             Console.ResetColor();
             Console.WriteLine();
-
-            bool shouldUpdate = false;
 
             try
             {
                 Console.WriteLine("[*] Checking for updates...");
                 string latestVersion = await GetLatestVersion();
 
-                if (latestVersion == null)
-                {
-                    Console.WriteLine("[!] Could not check for updates. Continuing...");
-                }
-                else if (latestVersion == CurrentVersion)
-                {
-                    Console.WriteLine("[+] You are up to date! (v" + CurrentVersion + ")");
-                }
-                else
+                if (latestVersion != null && latestVersion != CurrentVersion)
                 {
                     Console.WriteLine("[!] New version available: v" + latestVersion);
                     Console.WriteLine("[*] Downloading update...");
-                    shouldUpdate = await DownloadUpdate(latestVersion);
+                    await DownloadAndRestart(latestVersion);
+                    return;
+                }
+                else
+                {
+                    Console.WriteLine("[+] Up to date! (v" + CurrentVersion + ")");
                 }
             }
             catch (Exception ex)
@@ -56,17 +51,9 @@ namespace AutoUpdater
             }
 
             Console.WriteLine();
-            Console.WriteLine("[*] Starting application...");
+            Console.WriteLine("[*] App is running! Do your stuff here.");
             Console.WriteLine();
-
-            StartMainApp();
-
-            if (shouldUpdate)
-            {
-                Console.WriteLine("[*] Update downloaded. Will apply on next restart.");
-            }
-
-            Console.WriteLine("Press any key to exit updater...");
+            Console.WriteLine("Press any key to exit...");
             Console.ReadKey();
         }
 
@@ -74,19 +61,18 @@ namespace AutoUpdater
         {
             using (HttpClient client = new HttpClient())
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "ENI-Updater");
-
+                client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
                 string url = "https://raw.githubusercontent.com/" + GitHubUser + "/" + GitHubRepo + "/main/version.txt";
                 string version = await client.GetStringAsync(url);
                 return version.Trim();
             }
         }
 
-        static async Task<bool> DownloadUpdate(string version)
+        static async Task DownloadAndRestart(string version)
         {
             using (HttpClient client = new HttpClient())
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "ENI-Updater");
+                client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
 
                 string exeUrl = "https://raw.githubusercontent.com/" + GitHubUser + "/" + GitHubRepo + "/main/app.exe";
                 string currentPath = Assembly.GetExecutingAssembly().Location;
@@ -97,8 +83,10 @@ namespace AutoUpdater
                 byte[] exeBytes = await client.GetByteArrayAsync(exeUrl);
                 File.WriteAllBytes(tempPath, exeBytes);
 
+                Console.WriteLine("[+] Update downloaded. Restarting...");
+
                 string batContent = "@echo off\r\n" +
-                    "timeout /t 2 /nobreak >nul\r\n" +
+                    "timeout /t 1 /nobreak >nul\r\n" +
                     "del /f /q \"" + currentPath + "\"\r\n" +
                     "rename \"" + tempPath + "\" \"" + Path.GetFileName(currentPath) + "\"\r\n" +
                     "del /f /q \"" + batPath + "\"\r\n" +
@@ -113,22 +101,7 @@ namespace AutoUpdater
                     CreateNoWindow = true
                 });
 
-                return true;
-            }
-        }
-
-        static void StartMainApp()
-        {
-            string appPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "main_app.exe");
-
-            if (File.Exists(appPath))
-            {
-                Process.Start(appPath);
-            }
-            else
-            {
-                Console.WriteLine("[!] main_app.exe not found.");
-                Console.WriteLine("[*] Place your app as main_app.exe in the same folder.");
+                Environment.Exit(0);
             }
         }
     }
