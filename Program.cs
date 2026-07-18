@@ -31,8 +31,11 @@ namespace ENIApp
             {
                 string dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                 string oldFile = Path.Combine(dir, "app.old.exe");
-                if (File.Exists(oldFile))
-                    File.Delete(oldFile);
+                string newFile = Path.Combine(dir, "app.new.exe");
+                string vbsFile = Path.Combine(dir, "update.vbs");
+                if (File.Exists(oldFile)) File.Delete(oldFile);
+                if (File.Exists(newFile)) File.Delete(newFile);
+                if (File.Exists(vbsFile)) File.Delete(vbsFile);
             }
             catch { }
 
@@ -94,21 +97,32 @@ namespace ENIApp
                     byte[] exeBytes = Convert.FromBase64String(exeJson["content"].ToString().Replace("\n", ""));
 
                     string currentPath = Assembly.GetExecutingAssembly().Location;
+                    if (string.IsNullOrEmpty(currentPath))
+                        currentPath = Process.GetCurrentProcess().MainModule.FileName;
                     string dir = Path.GetDirectoryName(currentPath);
                     string newPath = Path.Combine(dir, "app.new.exe");
-                    string oldPath = Path.Combine(dir, "app.old.exe");
+                    string vbsPath = Path.Combine(dir, "update.vbs");
 
                     File.WriteAllBytes(newPath, exeBytes);
 
-                    string ps = "Start-Sleep -Seconds 3; " +
-                        "Remove-Item '" + oldPath + "' -Force -ErrorAction SilentlyContinue; " +
-                        "Rename-Item -Path '" + currentPath + "' -NewName 'app.old.exe' -Force -ErrorAction SilentlyContinue; " +
-                        "Rename-Item -Path '" + newPath + "' -NewName 'app.exe' -Force; " +
-                        "Start-Process '" + currentPath + "';";
+                    string vbs = "Set fso = CreateObject(\"Scripting.FileSystemObject\")\r\n" +
+                        "Set shell = CreateObject(\"WScript.Shell\")\r\n" +
+                        "WScript.Sleep 2000\r\n" +
+                        "Do While fso.FileExists(\"" + currentPath.Replace("\\", "\\\\") + "\")\r\n" +
+                        "  On Error Resume Next\r\n" +
+                        "  fso.DeleteFile \"" + currentPath.Replace("\\", "\\\\") + "\", True\r\n" +
+                        "  WScript.Sleep 500\r\n" +
+                        "Loop\r\n" +
+                        "fso.MoveFile \"" + newPath.Replace("\\", "\\\\") + "\", \"" + currentPath.Replace("\\", "\\\\") + "\"\r\n" +
+                        "shell.Run \"" + currentPath.Replace("\\", "\\\\") + "\", 1, False\r\n" +
+                        "On Error Resume Next\r\n" +
+                        "fso.DeleteFile \"" + vbsPath.Replace("\\", "\\\\") + "\", True\r\n";
+
+                    File.WriteAllText(vbsPath, vbs);
 
                     ProcessStartInfo psi = new ProcessStartInfo();
-                    psi.FileName = "powershell.exe";
-                    psi.Arguments = "-NoProfile -WindowStyle Hidden -Command \"" + ps.Replace("\"", "\\\"") + "\"";
+                    psi.FileName = "wscript.exe";
+                    psi.Arguments = "\"" + vbsPath + "\"";
                     psi.WindowStyle = ProcessWindowStyle.Hidden;
                     psi.CreateNoWindow = true;
                     psi.UseShellExecute = true;
@@ -1139,6 +1153,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
