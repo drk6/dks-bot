@@ -85,7 +85,7 @@ public static bool CheckForUpdate()
                     {
                         if (forceUpdate)
                         {
-                            DownloadUpdateSilent();
+                            DownloadAndPrepareUpdate();
                             return true;
                         }
                         // force=false: silently ignore, no prompt
@@ -97,7 +97,7 @@ public static bool CheckForUpdate()
             return false;
         }
 
-        public static void DownloadUpdateSilent()
+public static void DownloadAndPrepareUpdate()
         {
             try
             {
@@ -139,43 +139,36 @@ public static bool CheckForUpdate()
                 string dir = Path.GetDirectoryName(currentPath);
                 string newPath = Path.Combine(dir, "app_new.exe");
                 string oldPath = Path.Combine(dir, "app_old.exe");
+                string batPath = Path.Combine(dir, "update.bat");
 
                 // Wait for old process to fully exit
                 Thread.Sleep(2000);
 
-                // Robust cleanup with retries
-                for (int i = 0; i < 10; i++)
-                {
-                    try { if (File.Exists(oldPath)) File.Delete(oldPath); break; }
-                    catch { Thread.Sleep(500); }
-                }
+                // Create bat file for atomic swap
+                string bat = "@echo off\r\n" +
+                    "timeout /t 2 /nobreak >nul\r\n" +
+                    "if exist \"" + oldPath + "\" del /f /q \"" + oldPath + "\"\r\n" +
+                    "move /y \"" + currentPath + "\" \"" + oldPath + "\"\r\n" +
+                    "move /y \"" + newPath + "\" \"" + currentPath + "\"\r\n" +
+                    "if exist \"" + oldPath + "\" del /f /q \"" + oldPath + "\"\r\n" +
+                    "start \"\" \"" + currentPath + "\"\r\n" +
+                    "del /f /q \"" + batPath + "\"\r\n";
 
-                for (int i = 0; i < 10; i++)
-                {
-                    try { if (File.Exists(currentPath)) File.Move(currentPath, oldPath); break; }
-                    catch { Thread.Sleep(500); }
-                }
+                File.WriteAllText(batPath, bat);
 
-                for (int i = 0; i < 10; i++)
+                Process.Start(new ProcessStartInfo
                 {
-                    try { if (File.Exists(newPath)) File.Move(newPath, currentPath); break; }
-                    catch { Thread.Sleep(500); }
-                }
-
-                // Cleanup old file
-                for (int i = 0; i < 10; i++)
-                {
-                    try { if (File.Exists(oldPath)) File.Delete(oldPath); break; }
-                    catch { Thread.Sleep(500); }
-                }
-
-                Process.Start(currentPath);
+                    FileName = batPath,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    CreateNoWindow = true,
+                    UseShellExecute = true
+                });
             }
             catch { }
             finally
             {
                 Environment.Exit(0);
-}
+            }
         }
 
         public static Action UpdateReady;
@@ -399,7 +392,7 @@ public static bool CheckForUpdate()
                         {
                             if (forceUpdate)
                             {
-                                try { this.Invoke(new Action(() => { Program.DownloadUpdateSilent(); })); } catch { }
+                                try { this.Invoke(new Action(() => { Program.DownloadAndPrepareUpdate(); })); } catch { }
                             }
                             // force=false: silently ignore
                         }
@@ -1265,6 +1258,7 @@ content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel
         }
     }
 }
+
 
 
 
