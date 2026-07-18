@@ -160,6 +160,8 @@ namespace ENIApp
         private Keys pendingHotkey;
         private TextBox pendingHotkeyBox;
         private bool running = true;
+        private int circlePendingKey = 0x50;
+        private int squarePendingKey = 0x4F;
 
         public MainForm()
         {
@@ -465,6 +467,32 @@ namespace ENIApp
                 ReadOnly = true
             };
 
+            hotkeyBox.GotFocus += (s, e) =>
+            {
+                hotkeyBox.Text = "Press a key...";
+                hotkeyListening = true;
+                Thread t = new Thread(() =>
+                {
+                    while (hotkeyListening)
+                    {
+                        for (int i = 1; i < 256; i++)
+                        {
+                            if (GetAsyncKeyState(i) == -32767)
+                            {
+                                circlePendingKey = i;
+                                Keys k = (Keys)i;
+                                string name = k.ToString();
+                                try { this.Invoke(new Action(() => { hotkeyBox.Text = name; hotkeyListening = false; })); } catch { }
+                                return;
+                            }
+                        }
+                        Thread.Sleep(10);
+                    }
+                });
+                t.IsBackground = true;
+                t.Start();
+            };
+
             var setHotkeyBtn = new Button
             {
                 Text = "Set",
@@ -545,34 +573,13 @@ namespace ENIApp
 
             setHotkeyBtn.Click += (s, e) =>
             {
-                hotkeyBox.Text = "Press a key...";
-                hotkeyListening = true;
-                pendingHotkeyBox = hotkeyBox;
-                Thread t = new Thread(() =>
-                {
-                    while (hotkeyListening)
-                    {
-                        for (int i = 1; i < 256; i++)
-                        {
-                            if (GetAsyncKeyState(i) == -32767)
-                            {
-                                circleHotkey = i;
-                                Keys k = (Keys)i;
-                                string name = k.ToString();
-                                try { this.Invoke(new Action(() => { hotkeyBox.Text = name; hotkeyListening = false; })); } catch { }
-                                return;
-                            }
-                        }
-                        Thread.Sleep(10);
-                    }
-                });
-                t.IsBackground = true;
-                t.Start();
+                circleHotkey = circlePendingKey;
             };
 
             clearHotkeyBtn.Click += (s, e) =>
             {
                 circleHotkey = 0;
+                circlePendingKey = 0;
                 hotkeyBox.Text = "None";
             };
 
@@ -646,6 +653,32 @@ namespace ENIApp
                 Font = new Font("Segoe UI", 11),
                 Text = "O",
                 ReadOnly = true
+            };
+
+            hotkeyBox.GotFocus += (s, e) =>
+            {
+                hotkeyBox.Text = "Press a key...";
+                hotkeyListening = true;
+                Thread t = new Thread(() =>
+                {
+                    while (hotkeyListening)
+                    {
+                        for (int i = 1; i < 256; i++)
+                        {
+                            if (GetAsyncKeyState(i) == -32767)
+                            {
+                                squarePendingKey = i;
+                                Keys k = (Keys)i;
+                                string name = k.ToString();
+                                try { this.Invoke(new Action(() => { hotkeyBox.Text = name; hotkeyListening = false; })); } catch { }
+                                return;
+                            }
+                        }
+                        Thread.Sleep(10);
+                    }
+                });
+                t.IsBackground = true;
+                t.Start();
             };
 
             var setHotkeyBtn = new Button
@@ -728,34 +761,13 @@ namespace ENIApp
 
             setHotkeyBtn.Click += (s, e) =>
             {
-                hotkeyBox.Text = "Press a key...";
-                hotkeyListening = true;
-                pendingHotkeyBox = hotkeyBox;
-                Thread t = new Thread(() =>
-                {
-                    while (hotkeyListening)
-                    {
-                        for (int i = 1; i < 256; i++)
-                        {
-                            if (GetAsyncKeyState(i) == -32767)
-                            {
-                                squareHotkey = i;
-                                Keys k = (Keys)i;
-                                string name = k.ToString();
-                                try { this.Invoke(new Action(() => { hotkeyBox.Text = name; hotkeyListening = false; })); } catch { }
-                                return;
-                            }
-                        }
-                        Thread.Sleep(10);
-                    }
-                });
-                t.IsBackground = true;
-                t.Start();
+                squareHotkey = squarePendingKey;
             };
 
             clearHotkeyBtn.Click += (s, e) =>
             {
                 squareHotkey = 0;
+                squarePendingKey = 0;
                 hotkeyBox.Text = "None";
             };
 
