@@ -18,20 +18,9 @@ namespace ENIApp
         public static string GitHubUser = "drk6";
         public static string GitHubRepo = ".exe-app";
         public static string GitHubToken = "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";
-        public static string CurrentVersion = "1.0.0";
+        public static string CurrentVersion = "1.0.10";
 
         [STAThread]
-        static void Log(string msg)
-        {
-            try
-            {
-                string dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                if (string.IsNullOrEmpty(dir)) dir = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
-                File.AppendAllText(Path.Combine(dir, "update_log.txt"), DateTime.Now + ": " + msg + "\r\n");
-            }
-            catch { }
-        }
-
         static void Main()
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
@@ -45,51 +34,21 @@ namespace ENIApp
             string mainExe = Path.Combine(dir, "app.exe");
             string newExe = Path.Combine(dir, "app_new.exe");
 
-            Log("Start: myPath=" + myPath + " mainExe=" + mainExe);
-
             if (Path.GetFileName(myPath).ToLower() == "app_new.exe")
             {
-                Log("I am app_new.exe, waiting 3s...");
-                Thread.Sleep(3000);
-                for (int i = 0; i < 20; i++)
-                {
-                    try
-                    {
-                        if (File.Exists(mainExe))
-                        {
-                            Log("Attempt " + i + ": deleting app.exe...");
-                            File.Delete(mainExe);
-                            Log("Deleted app.exe");
-                        }
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log("Delete failed attempt " + i + ": " + ex.Message);
-                        Thread.Sleep(500);
-                    }
-                }
-                try
-                {
-                    File.Move(myPath, mainExe);
-                    Log("Renamed app_new.exe to app.exe");
-                    Process.Start(mainExe);
-                    Log("Started app.exe");
-                }
-                catch (Exception ex)
-                {
-                    Log("Move/Start failed: " + ex.Message);
-                }
+                try { if (File.Exists(mainExe)) File.Delete(mainExe); } catch { }
+                try { File.Move(myPath, mainExe); } catch { }
+                try { Process.Start(mainExe); } catch { }
                 Environment.Exit(0);
                 return;
             }
 
             try
             {
+                if (File.Exists(newExe)) File.Delete(newExe);
                 string oldFile = Path.Combine(dir, "app.old.exe");
                 string vbsFile = Path.Combine(dir, "update.vbs");
                 if (File.Exists(oldFile)) File.Delete(oldFile);
-                if (File.Exists(newExe)) File.Delete(newExe);
                 if (File.Exists(vbsFile)) File.Delete(vbsFile);
             }
             catch { }
@@ -1184,6 +1143,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
