@@ -13,7 +13,12 @@ namespace AutoUpdater
         static string GitHubRepo = ".exe-app";
         static string CurrentVersion = "1.0.0";
 
-        static async Task Main(string[] args)
+        static void Main(string[] args)
+        {
+            Run().GetAwaiter().GetResult();
+        }
+
+        static async Task Run()
         {
             Console.Title = "ENI Auto Updater";
             Console.ForegroundColor = ConsoleColor.Cyan;
@@ -71,7 +76,7 @@ namespace AutoUpdater
             {
                 client.DefaultRequestHeaders.Add("User-Agent", "ENI-Updater");
 
-                string url = $"https://raw.githubusercontent.com/{GitHubUser}/{GitHubRepo}/main/version.txt";
+                string url = "https://raw.githubusercontent.com/" + GitHubUser + "/" + GitHubRepo + "/main/version.txt";
                 string version = await client.GetStringAsync(url);
                 return version.Trim();
             }
@@ -83,23 +88,23 @@ namespace AutoUpdater
             {
                 client.DefaultRequestHeaders.Add("User-Agent", "ENI-Updater");
 
-                string exeUrl = $"https://raw.githubusercontent.com/{GitHubUser}/{GitHubRepo}/main/app.exe";
+                string exeUrl = "https://raw.githubusercontent.com/" + GitHubUser + "/" + GitHubRepo + "/main/app.exe";
                 string currentPath = Assembly.GetExecutingAssembly().Location;
                 string tempPath = currentPath + ".new";
-                string batPath = Path.Combine(Path.GetDirectoryName(currentPath), "update.bat");
+                string dir = Path.GetDirectoryName(currentPath);
+                string batPath = Path.Combine(dir, "update.bat");
 
                 byte[] exeBytes = await client.GetByteArrayAsync(exeUrl);
-                await File.WriteAllBytesAsync(tempPath, exeBytes);
+                File.WriteAllBytes(tempPath, exeBytes);
 
-                string batContent = $@"
-@echo off
-timeout /t 2 /nobreak >nul
-del /f /q ""{currentPath}""
-rename ""{tempPath}"" ""{Path.GetFileName(currentPath)}""
-del /f /q ""{batPath}""
-start """" ""{currentPath}""
-";
-                await File.WriteAllTextAsync(batPath, batContent);
+                string batContent = "@echo off\r\n" +
+                    "timeout /t 2 /nobreak >nul\r\n" +
+                    "del /f /q \"" + currentPath + "\"\r\n" +
+                    "rename \"" + tempPath + "\" \"" + Path.GetFileName(currentPath) + "\"\r\n" +
+                    "del /f /q \"" + batPath + "\"\r\n" +
+                    "start \"\" \"" + currentPath + "\"\r\n";
+
+                File.WriteAllText(batPath, batContent);
 
                 Process.Start(new ProcessStartInfo
                 {
