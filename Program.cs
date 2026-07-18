@@ -876,37 +876,17 @@ namespace ENIApp
                                 try { this.Invoke(new Action(() =>
                                 {
                                     statusLabel.ForeColor = accentColor;
-                                    statusLabel.Text = "Starting GitHub login...";
+                                    statusLabel.Text = "Opening browser for GitHub login...";
                                     content.Refresh();
                                 })); } catch { }
 
                                 Process ghProcess = new Process();
                                 ghProcess.StartInfo.FileName = ghPath;
-                                ghProcess.StartInfo.Arguments = "auth login -p https -h github.com -w";
-                                ghProcess.StartInfo.UseShellExecute = false;
-                                ghProcess.StartInfo.RedirectStandardOutput = true;
-                                ghProcess.StartInfo.RedirectStandardError = true;
-                                ghProcess.StartInfo.CreateNoWindow = true;
+                                ghProcess.StartInfo.Arguments = "auth login --hostname github.com --git-protocol https --web";
+                                ghProcess.StartInfo.UseShellExecute = true;
                                 ghProcess.Start();
 
-                                string deviceUrl = "";
-                                ghProcess.ErrorDataReceived += (sender, args) =>
-                                {
-                                    if (args.Data != null && args.Data.Contains("https://github.com/login/device"))
-                                    {
-                                        deviceUrl = args.Data.Trim();
-                                        try { Process.Start(new ProcessStartInfo { FileName = deviceUrl, UseShellExecute = true }); } catch { }
-                                        try { this.Invoke(new Action(() =>
-                                        {
-                                            statusLabel.Text = "Authorize in browser, then click Login again";
-                                        })); } catch { }
-                                    }
-                                };
-                                ghProcess.BeginErrorReadLine();
-
-                                ghProcess.WaitForExit(180000);
-
-                                for (int attempt = 0; attempt < 30; attempt++)
+                                for (int attempt = 0; attempt < 60; attempt++)
                                 {
                                     Thread.Sleep(2000);
 
@@ -1161,6 +1141,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
