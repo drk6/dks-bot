@@ -828,7 +828,7 @@ namespace ENIApp
             else
             {
                 var info = MakeLabel("Click below to login with GitHub in your browser", 11, FontStyle.Regular, Color.FromArgb(120, 120, 130), 40, 80);
-                var info2 = MakeLabel("No tokens needed - just click and authorize", 11, FontStyle.Regular, Color.FromArgb(80, 80, 90), 40, 105);
+                var info2 = MakeLabel("You may have to press login twice", 11, FontStyle.Regular, Color.FromArgb(80, 80, 90), 40, 105);
 
                 var loginBtn = new Button
                 {
@@ -1143,6 +1143,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
