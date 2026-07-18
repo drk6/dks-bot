@@ -908,7 +908,7 @@ namespace ENIApp
                                     }
                                 }
 
-                            if (!hasValidToken)
+                            if (string.IsNullOrEmpty(existingToken) || (!existingToken.StartsWith("ghp_") && !existingToken.StartsWith("gho_")))
                                 {
                                     try { ghProcess.Kill(); } catch { }
                                     try { this.Invoke(new Action(() =>
@@ -1143,6 +1143,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
