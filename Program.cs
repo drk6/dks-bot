@@ -1,110 +1,242 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
-using System.Threading.Tasks;
+using System.Text;
+using System.Windows.Forms;
 
-namespace AutoUpdater
+namespace ENIApp
 {
     class Program
     {
         static string GitHubUser = "drk6";
         static string GitHubRepo = ".exe-app";
-        static string CurrentVersion = "1.0.0";
+        static string GitHubToken = "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";
+        public static string CurrentVersion = "1.0.0";
 
-        static void Main(string[] args)
+        [STAThread]
+        static void Main()
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-            Run().GetAwaiter().GetResult();
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            if (CheckForUpdate())
+                return;
+
+            Application.Run(new MainForm());
         }
 
-        static async Task Run()
+        static bool CheckForUpdate()
         {
-            Console.Title = "ENI App";
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("================================");
-            Console.WriteLine("         ENI App v" + CurrentVersion);
-            Console.WriteLine("================================");
-            Console.ResetColor();
-            Console.WriteLine();
-
             try
             {
-                Console.WriteLine("[*] Checking for updates...");
-                string latestVersion = await GetLatestVersion();
+                using (HttpClient client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
+                    client.DefaultRequestHeaders.Add("Authorization", "token " + GitHubToken);
 
-                if (latestVersion != null && latestVersion != CurrentVersion)
-                {
-                    Console.WriteLine("[!] New version available: v" + latestVersion);
-                    Console.WriteLine("[*] Downloading update...");
-                    await DownloadAndRestart(latestVersion);
-                    return;
+                    string versionUrl = "https://api.github.com/repos/" + GitHubUser + "/" + GitHubRepo + "/contents/version.txt";
+                    string versionResp = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
+                    dynamic versionJson = ParseJson(versionResp);
+                    string latestVersion = Encoding.UTF8.GetString(Convert.FromBase64String(versionJson.content.ToString().Replace("\n", ""))).Trim();
+
+                    if (latestVersion != CurrentVersion)
+                    {
+                        DialogResult result = MessageBox.Show(
+                            "New version available: v" + latestVersion + "\n\nUpdate now?",
+                            "ENI Updater",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Information
+                        );
+
+                        if (result == DialogResult.Yes)
+                        {
+                            DownloadUpdate();
+                            return true;
+                        }
+                    }
                 }
-                else
+            }
+            catch { }
+            return false;
+        }
+
+        static void DownloadUpdate()
+        {
+            try
+            {
+                using (HttpClient client = new HttpClient())
                 {
-                    Console.WriteLine("[+] Up to date! (v" + CurrentVersion + ")");
+                    client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
+                    client.DefaultRequestHeaders.Add("Authorization", "token " + GitHubToken);
+
+                    string exeUrl = "https://api.github.com/repos/" + GitHubUser + "/" + GitHubRepo + "/contents/app.exe";
+                    string exeResp = client.GetStringAsync(exeUrl).GetAwaiter().GetResult();
+                    dynamic exeJson = ParseJson(exeResp);
+                    byte[] exeBytes = Convert.FromBase64String(exeJson.content.ToString().Replace("\n", ""));
+
+                    string currentPath = Assembly.GetExecutingAssembly().Location;
+                    string tempPath = currentPath + ".new";
+                    string dir = Path.GetDirectoryName(currentPath);
+                    string batPath = Path.Combine(dir, "update.bat");
+
+                    File.WriteAllBytes(tempPath, exeBytes);
+
+                    string bat = "@echo off\r\n" +
+                        "timeout /t 1 /nobreak >nul\r\n" +
+                        "del /f /q \"" + currentPath + "\"\r\n" +
+                        "rename \"" + tempPath + "\" \"" + Path.GetFileName(currentPath) + "\"\r\n" +
+                        "del /f /q \"" + batPath + "\"\r\n" +
+                        "start \"\" \"" + currentPath + "\"\r\n";
+
+                    File.WriteAllText(batPath, bat);
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = batPath,
+                        WindowStyle = ProcessWindowStyle.Hidden,
+                        CreateNoWindow = true
+                    });
+
+                    Environment.Exit(0);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[!] Update check failed: " + ex.Message);
-            }
-
-            Console.WriteLine();
-            Console.WriteLine("[*] App is running! Do your stuff here.");
-            Console.WriteLine();
-            Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
-        }
-
-        static async Task<string> GetLatestVersion()
-        {
-            using (HttpClient client = new HttpClient())
-            {
-                client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
-                string url = "https://raw.githubusercontent.com/" + GitHubUser + "/" + GitHubRepo + "/main/version.txt";
-                string version = await client.GetStringAsync(url);
-                return version.Trim();
+                MessageBox.Show("Update failed: " + ex.Message, "ENI Updater", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        static async Task DownloadAndRestart(string version)
+        static object ParseJson(string json)
         {
-            using (HttpClient client = new HttpClient())
+            return new System.Web.Script.Serialization.JavaScriptSerializer().DeserializeObject(json);
+        }
+    }
+
+    public class MainForm : Form
+    {
+        private Panel sidebar;
+        private Panel content;
+        private Label titleLabel;
+        private Label versionLabel;
+        private Button btnHome;
+        private Button btnScripts;
+        private Button btnSettings;
+
+        public MainForm()
+        {
+            Text = "ENI App";
+            Size = new Size(900, 600);
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = Color.FromArgb(30, 30, 30);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
+
+            sidebar = new Panel
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
+                Size = new Size(200, 600),
+                BackColor = Color.FromArgb(20, 20, 20),
+                Dock = DockStyle.Left
+            };
 
-                string exeUrl = "https://raw.githubusercontent.com/" + GitHubUser + "/" + GitHubRepo + "/main/app.exe";
-                string currentPath = Assembly.GetExecutingAssembly().Location;
-                string tempPath = currentPath + ".new";
-                string dir = Path.GetDirectoryName(currentPath);
-                string batPath = Path.Combine(dir, "update.bat");
+            titleLabel = new Label
+            {
+                Text = "ENI",
+                Font = new Font("Segoe UI", 24, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 200, 255),
+                Location = new Point(20, 20),
+                AutoSize = true
+            };
 
-                byte[] exeBytes = await client.GetByteArrayAsync(exeUrl);
-                File.WriteAllBytes(tempPath, exeBytes);
+            versionLabel = new Label
+            {
+                Text = "v" + Program.CurrentVersion,
+                Font = new Font("Segoe UI", 10),
+                ForeColor = Color.Gray,
+                Location = new Point(20, 60),
+                AutoSize = true
+            };
 
-                Console.WriteLine("[+] Update downloaded. Restarting...");
+            btnHome = CreateButton("Home", 100);
+            btnScripts = CreateButton("Scripts", 150);
+            btnSettings = CreateButton("Settings", 200);
 
-                string batContent = "@echo off\r\n" +
-                    "timeout /t 1 /nobreak >nul\r\n" +
-                    "del /f /q \"" + currentPath + "\"\r\n" +
-                    "rename \"" + tempPath + "\" \"" + Path.GetFileName(currentPath) + "\"\r\n" +
-                    "del /f /q \"" + batPath + "\"\r\n" +
-                    "start \"\" \"" + currentPath + "\"\r\n";
+            btnHome.Click += (s, e) => ShowPage("home");
+            btnScripts.Click += (s, e) => ShowPage("scripts");
+            btnSettings.Click += (s, e) => ShowPage("settings");
 
-                File.WriteAllText(batPath, batContent);
+            sidebar.Controls.AddRange(new Control[] { titleLabel, versionLabel, btnHome, btnScripts, btnSettings });
 
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = batPath,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    CreateNoWindow = true
-                });
+            content = new Panel
+            {
+                Size = new Size(700, 600),
+                BackColor = Color.FromArgb(30, 30, 30),
+                Dock = DockStyle.Fill
+            };
 
-                Environment.Exit(0);
+            Controls.AddRange(new Control[] { sidebar, content });
+
+            ShowPage("home");
+        }
+
+        private Button CreateButton(string text, int y)
+        {
+            return new Button
+            {
+                Text = text,
+                Size = new Size(200, 40),
+                Location = new Point(0, y),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(30, 30, 30),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 12),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(20, 0, 0, 0),
+                Cursor = Cursors.Hand
+            };
+        }
+
+        private void ShowPage(string page)
+        {
+            content.Controls.Clear();
+
+            var titleLabel2 = new Label
+            {
+                Font = new Font("Segoe UI", 20, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(30, 30),
+                AutoSize = true
+            };
+
+            var descLabel = new Label
+            {
+                Font = new Font("Segoe UI", 11),
+                ForeColor = Color.Gray,
+                Location = new Point(30, 80),
+                Size = new Size(600, 40)
+            };
+
+            switch (page)
+            {
+                case "home":
+                    titleLabel2.Text = "Welcome to ENI App";
+                    descLabel.Text = "Your all-in-one tool hub. Use the sidebar to navigate.";
+                    break;
+                case "scripts":
+                    titleLabel2.Text = "Scripts";
+                    descLabel.Text = "Your scripts and tools will appear here.";
+                    break;
+                case "settings":
+                    titleLabel2.Text = "Settings";
+                    descLabel.Text = "App settings and configuration.";
+                    break;
             }
+
+            content.Controls.AddRange(new Control[] { titleLabel2, descLabel });
         }
     }
 }
