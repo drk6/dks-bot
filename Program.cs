@@ -447,6 +447,10 @@ namespace ENIApp
             return btn;
         }
 
+        private System.Windows.Forms.Timer slideTimer;
+        private int slideTarget = 100;
+        private int slideSpeed = 0;
+
         private void HighlightButton(Button btn)
         {
             if (activeButton != null)
@@ -456,7 +460,27 @@ namespace ENIApp
             }
             activeButton = btn;
             activeButton.ForeColor = Color.White;
-            activeIndicator.Top = btn.Top + 1;
+            slideTarget = btn.Top + 1;
+
+            if (slideTimer == null)
+            {
+                slideTimer = new System.Windows.Forms.Timer();
+                slideTimer.Interval = 8;
+                slideTimer.Tick += SlideTick;
+            }
+            slideTimer.Start();
+        }
+
+        private void SlideTick(object sender, EventArgs e)
+        {
+            int diff = slideTarget - activeIndicator.Top;
+            if (Math.Abs(diff) < 2)
+            {
+                activeIndicator.Top = slideTarget;
+                slideTimer.Stop();
+                return;
+            }
+            activeIndicator.Top += diff / 3;
         }
 
         private void ShowPage(string page)
@@ -813,7 +837,7 @@ namespace ENIApp
                 {
                     loginBtn.Enabled = false;
                     statusLabel.ForeColor = accentColor;
-                    statusLabel.Text = "Opening browser for GitHub login...";
+                    statusLabel.Text = "Checking GitHub login...";
                     content.Refresh();
 
                     Thread loginThread = new Thread(() =>
@@ -822,71 +846,95 @@ namespace ENIApp
                         {
                             string ghPath = "C:\\Program Files\\GitHub CLI\\gh.exe";
 
-                            Process ghProcess = new Process();
-                            ghProcess.StartInfo.FileName = ghPath;
-                            ghProcess.StartInfo.Arguments = "auth login --hostname github.com --git-protocol https --web";
-                            ghProcess.StartInfo.UseShellExecute = true;
-                            ghProcess.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                            ghProcess.Start();
+                            Process checkProcess = new Process();
+                            checkProcess.StartInfo.FileName = ghPath;
+                            checkProcess.StartInfo.Arguments = "auth token --hostname github.com";
+                            checkProcess.StartInfo.UseShellExecute = false;
+                            checkProcess.StartInfo.RedirectStandardOutput = true;
+                            checkProcess.StartInfo.CreateNoWindow = true;
+                            checkProcess.Start();
+                            string existingToken = checkProcess.StandardOutput.ReadToEnd().Trim();
+                            checkProcess.WaitForExit();
 
-                            for (int attempt = 0; attempt < 60; attempt++)
+                            if (string.IsNullOrEmpty(existingToken) || !existingToken.StartsWith("ghp_"))
                             {
-                                Thread.Sleep(2000);
+                                try { this.Invoke(new Action(() =>
+                                {
+                                    statusLabel.ForeColor = accentColor;
+                                    statusLabel.Text = "Opening browser for GitHub login...";
+                                    content.Refresh();
+                                })); } catch { }
 
-                                Process tokenProcess = new Process();
-                                tokenProcess.StartInfo.FileName = ghPath;
-                                tokenProcess.StartInfo.Arguments = "auth token --hostname github.com";
-                                tokenProcess.StartInfo.UseShellExecute = false;
-                                tokenProcess.StartInfo.RedirectStandardOutput = true;
-                                tokenProcess.StartInfo.CreateNoWindow = true;
-                                tokenProcess.Start();
-                                string token = tokenProcess.StandardOutput.ReadToEnd().Trim();
-                                tokenProcess.WaitForExit();
+                                Process ghProcess = new Process();
+                                ghProcess.StartInfo.FileName = ghPath;
+                                ghProcess.StartInfo.Arguments = "auth login --hostname github.com --git-protocol https --web";
+                                ghProcess.StartInfo.UseShellExecute = true;
+                                ghProcess.Start();
 
-                                if (!string.IsNullOrEmpty(token) && token.StartsWith("ghp_"))
+                                for (int attempt = 0; attempt < 60; attempt++)
+                                {
+                                    Thread.Sleep(2000);
+
+                                    Process tokenProcess = new Process();
+                                    tokenProcess.StartInfo.FileName = ghPath;
+                                    tokenProcess.StartInfo.Arguments = "auth token --hostname github.com";
+                                    tokenProcess.StartInfo.UseShellExecute = false;
+                                    tokenProcess.StartInfo.RedirectStandardOutput = true;
+                                    tokenProcess.StartInfo.CreateNoWindow = true;
+                                    tokenProcess.Start();
+                                    string token = tokenProcess.StandardOutput.ReadToEnd().Trim();
+                                    tokenProcess.WaitForExit();
+
+                                    if (!string.IsNullOrEmpty(token) && token.StartsWith("ghp_"))
+                                    {
+                                        existingToken = token;
+                                        try { ghProcess.Kill(); } catch { }
+                                        break;
+                                    }
+                                }
+
+                                if (string.IsNullOrEmpty(existingToken) || !existingToken.StartsWith("ghp_"))
                                 {
                                     try { ghProcess.Kill(); } catch { }
-
-                                    loginToken = token;
-
-                                    using (HttpClient client = new HttpClient())
+                                    try { this.Invoke(new Action(() =>
                                     {
-                                        client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
-                                        client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
-                                        string resp = client.GetStringAsync("https://api.github.com/user").GetAwaiter().GetResult();
-                                        dynamic json = Program.ParseJson(resp);
-                                        string user = json.login.ToString();
-                                        isLoggedIn = true;
-                                        loggedInUser = user;
-                                        SaveSettings();
-
-                                        try { this.Invoke(new Action(() =>
-                                        {
-                                            if (user == "drk6")
-                                            {
-                                                devButton.Visible = true;
-                                                statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
-                                                statusLabel.Text = "Logged in as " + user + " (Dev)";
-                                            }
-                                            else
-                                            {
-                                                statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
-                                                statusLabel.Text = "Logged in as " + user;
-                                            }
-                                            loginBtn.Enabled = true;
-                                        })); } catch { }
-                                    }
+                                        statusLabel.ForeColor = Color.Red;
+                                        statusLabel.Text = "Login timed out. Try again.";
+                                        loginBtn.Enabled = true;
+                                    })); } catch { }
                                     return;
                                 }
                             }
 
-                            try { ghProcess.Kill(); } catch { }
-                            try { this.Invoke(new Action(() =>
+                            loginToken = existingToken;
+
+                            using (HttpClient client = new HttpClient())
                             {
-                                statusLabel.ForeColor = Color.Red;
-                                statusLabel.Text = "Login timed out. Try again.";
-                                loginBtn.Enabled = true;
-                            })); } catch { }
+                                client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
+                                client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
+                                string resp = client.GetStringAsync("https://api.github.com/user").GetAwaiter().GetResult();
+                                dynamic json = Program.ParseJson(resp);
+                                string user = json.login.ToString();
+                                isLoggedIn = true;
+                                loggedInUser = user;
+                                SaveSettings();
+
+                                try { this.Invoke(new Action(() =>
+                                {
+                                    if (user == "drk6")
+                                    {
+                                        devButton.Visible = true;
+                                        statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
+                                        statusLabel.Text = "Logged in as " + user + " (Dev)";
+                                    }
+                                    else
+                                    {
+                                        statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
+                                        statusLabel.Text = "Logged in as " + user;
+                                    }
+                                    loginBtn.Enabled = true;
+                                })); } catch { }
+                            }
                         }
                         catch (Exception ex)
                         {
