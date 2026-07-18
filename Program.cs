@@ -1,13 +1,13 @@
 using System;
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace ENIApp
@@ -149,6 +149,18 @@ namespace ENIApp
         [StructLayout(LayoutKind.Sequential)]
         public struct POINT { public int X; public int Y; }
 
+        private int circleHotkey = 0x50;
+        private int squareHotkey = 0x4F;
+        private int circleWaitMs = 1500;
+        private int squareWaitMs = 1500;
+        private double circleSpeedMs = 6.0;
+        private double squareSpeedMs = 3.0;
+        private Thread hotkeyThread;
+        private bool hotkeyListening = false;
+        private Keys pendingHotkey;
+        private TextBox pendingHotkeyBox;
+        private bool running = true;
+
         public MainForm()
         {
             Text = "ENI App";
@@ -215,7 +227,106 @@ namespace ENIApp
             Controls.Add(content);
             Controls.Add(sidebar);
 
+            hotkeyThread = new Thread(HotkeyLoop);
+            hotkeyThread.IsBackground = true;
+            hotkeyThread.Start();
+
+            FormClosing += (s, e) => { running = false; };
+
             ShowPage("home");
+        }
+
+        private void HotkeyLoop()
+        {
+            while (running)
+            {
+                if (GetAsyncKeyState(circleHotkey) == -32767)
+                {
+                    try { this.Invoke(new Action(() => RunCircleDraw())); } catch { }
+                }
+                if (GetAsyncKeyState(squareHotkey) == -32767)
+                {
+                    try { this.Invoke(new Action(() => RunSquareDraw())); } catch { }
+                }
+                Thread.Sleep(10);
+            }
+        }
+
+        private void RunCircleDraw()
+        {
+            POINT pos;
+            GetCursorPos(out pos);
+            double cx = pos.X;
+            double cy = pos.Y;
+
+            int radius = 100;
+
+            int steps = 800;
+            SetCursorPos((int)(cx + radius), (int)cy);
+            Thread.Sleep(100);
+            mouse_event(0x02, 0, 0, 0, IntPtr.Zero);
+
+            var sw = Stopwatch.StartNew();
+            for (int i = 1; i <= steps; i++)
+            {
+                double angle = (2.0 * Math.PI * i) / steps;
+                int x = (int)Math.Round(cx + (radius * Math.Cos(angle)));
+                int y = (int)Math.Round(cy + (radius * Math.Sin(angle)));
+                SetCursorPos(x, y);
+                double expected = i * circleSpeedMs;
+                while (sw.Elapsed.TotalMilliseconds < expected) { }
+            }
+
+            SetCursorPos((int)(cx + radius), (int)cy);
+            mouse_event(0x04, 0, 0, 0, IntPtr.Zero);
+        }
+
+        private void RunSquareDraw()
+        {
+            POINT pos;
+            GetCursorPos(out pos);
+            double sx = pos.X;
+            double sy = pos.Y;
+            int size = 300;
+
+            int stepsPerSide = 200;
+            SetCursorPos((int)sx, (int)sy);
+            Thread.Sleep(100);
+            mouse_event(0x02, 0, 0, 0, IntPtr.Zero);
+
+            var sw = Stopwatch.StartNew();
+            double targetMs = squareSpeedMs;
+
+            for (int i = 0; i <= stepsPerSide; i++)
+            {
+                double t = (double)i / stepsPerSide;
+                SetCursorPos((int)(sx + size * t), (int)sy);
+                double expected = i * targetMs;
+                while (sw.Elapsed.TotalMilliseconds < expected) { }
+            }
+            for (int i = 0; i <= stepsPerSide; i++)
+            {
+                double t = (double)i / stepsPerSide;
+                SetCursorPos((int)(sx + size), (int)(sy + size * t));
+                double expected = (stepsPerSide + i) * targetMs;
+                while (sw.Elapsed.TotalMilliseconds < expected) { }
+            }
+            for (int i = 0; i <= stepsPerSide; i++)
+            {
+                double t = (double)i / stepsPerSide;
+                SetCursorPos((int)(sx + size - size * t), (int)(sy + size));
+                double expected = (stepsPerSide * 2 + i) * targetMs;
+                while (sw.Elapsed.TotalMilliseconds < expected) { }
+            }
+            for (int i = 0; i <= stepsPerSide; i++)
+            {
+                double t = (double)i / stepsPerSide;
+                SetCursorPos((int)sx, (int)(sy + size - size * t));
+                double expected = (stepsPerSide * 3 + i) * targetMs;
+                while (sw.Elapsed.TotalMilliseconds < expected) { }
+            }
+
+            mouse_event(0x04, 0, 0, 0, IntPtr.Zero);
         }
 
         private Button CreateSidebarButton(string text, int y)
@@ -336,12 +447,65 @@ namespace ENIApp
         private void ShowCircle()
         {
             var title = MakeLabel("Circle Draw", 24, FontStyle.Bold, Color.White, 40, 30);
-            var sub = MakeLabel("Position your cursor on the circle outline, then press Start", 11, FontStyle.Regular, Color.FromArgb(100, 100, 110), 40, 75);
+            var sub = MakeLabel("Position cursor, then use hotkey or click Start", 11, FontStyle.Regular, Color.FromArgb(100, 100, 110), 40, 70);
 
-            var radiusLabel = MakeLabel("Radius (px):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, 120);
+            int y = 120;
+            int gap = 45;
+
+            var hotkeyLabel = MakeLabel("Hotkey:", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y);
+            var hotkeyBox = new TextBox
+            {
+                Location = new Point(160, y - 3),
+                Size = new Size(100, 30),
+                BackColor = cardColor,
+                ForeColor = accentColor,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 11),
+                Text = "P",
+                ReadOnly = true
+            };
+
+            var setHotkeyBtn = new Button
+            {
+                Text = "Set",
+                Location = new Point(270, y - 5),
+                Size = new Size(60, 32),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = hoverColor,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10),
+                Cursor = Cursors.Hand
+            };
+            setHotkeyBtn.FlatAppearance.BorderSize = 0;
+
+            var waitLabel = MakeLabel("Wait (sec):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y + gap);
+            var waitBox = new TextBox
+            {
+                Location = new Point(160, y + gap - 3),
+                Size = new Size(100, 30),
+                BackColor = cardColor,
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 11),
+                Text = "1.5"
+            };
+
+            var speedLabel = MakeLabel("Speed (ms):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y + gap * 2);
+            var speedBox = new TextBox
+            {
+                Location = new Point(160, y + gap * 2 - 3),
+                Size = new Size(100, 30),
+                BackColor = cardColor,
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 11),
+                Text = "6"
+            };
+
+            var radiusLabel = MakeLabel("Radius (px):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y + gap * 3);
             var radiusBox = new TextBox
             {
-                Location = new Point(160, 117),
+                Location = new Point(160, y + gap * 3 - 3),
                 Size = new Size(100, 30),
                 BackColor = cardColor,
                 ForeColor = Color.White,
@@ -350,13 +514,13 @@ namespace ENIApp
                 Text = "100"
             };
 
-            var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, 200);
+            var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, y + gap * 4 + 20);
             statusLabel.Size = new Size(600, 30);
 
             var startBtn = new Button
             {
                 Text = "Start Drawing",
-                Location = new Point(40, 165),
+                Location = new Point(40, y + gap * 4 + 55),
                 Size = new Size(220, 40),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = accentColor,
@@ -366,14 +530,49 @@ namespace ENIApp
             };
             startBtn.FlatAppearance.BorderSize = 0;
 
+            setHotkeyBtn.Click += (s, e) =>
+            {
+                hotkeyBox.Text = "Press a key...";
+                hotkeyListening = true;
+                pendingHotkeyBox = hotkeyBox;
+                Thread t = new Thread(() =>
+                {
+                    while (hotkeyListening)
+                    {
+                        for (int i = 1; i < 256; i++)
+                        {
+                            if (GetAsyncKeyState(i) == -32767)
+                            {
+                                circleHotkey = i;
+                                Keys k = (Keys)i;
+                                string name = k.ToString();
+                                try { this.Invoke(new Action(() => { hotkeyBox.Text = name; hotkeyListening = false; })); } catch { }
+                                return;
+                            }
+                        }
+                        Thread.Sleep(10);
+                    }
+                });
+                t.IsBackground = true;
+                t.Start();
+            };
+
             startBtn.Click += (s, e) =>
             {
-                int radius = 100;
-                int.TryParse(radiusBox.Text, out radius);
+                double waitSec = 1.5;
+                double.TryParse(waitBox.Text, out waitSec);
+                double spd = 6;
+                double.TryParse(speedBox.Text, out spd);
+                int rad = 100;
+                int.TryParse(radiusBox.Text, out rad);
+
+                circleWaitMs = (int)(waitSec * 1000);
+                circleSpeedMs = spd;
+
                 statusLabel.ForeColor = accentColor;
                 statusLabel.Text = "Get ready... move cursor to circle position!";
                 content.Refresh();
-                System.Threading.Thread.Sleep(1500);
+                Thread.Sleep(circleWaitMs);
 
                 POINT pos;
                 GetCursorPos(out pos);
@@ -384,40 +583,93 @@ namespace ENIApp
                 content.Refresh();
 
                 int steps = 800;
-                SetCursorPos((int)(cx + radius), (int)cy);
-                System.Threading.Thread.Sleep(100);
+                SetCursorPos((int)(cx + rad), (int)cy);
+                Thread.Sleep(100);
                 mouse_event(0x02, 0, 0, 0, IntPtr.Zero);
 
                 var sw = Stopwatch.StartNew();
                 for (int i = 1; i <= steps; i++)
                 {
                     double angle = (2.0 * Math.PI * i) / steps;
-                    int x = (int)Math.Round(cx + (radius * Math.Cos(angle)));
-                    int y = (int)Math.Round(cy + (radius * Math.Sin(angle)));
-                    SetCursorPos(x, y);
-                    double expected = i * 6.0;
+                    int x = (int)Math.Round(cx + (rad * Math.Cos(angle)));
+                    int y2 = (int)Math.Round(cy + (rad * Math.Sin(angle)));
+                    SetCursorPos(x, y2);
+                    double expected = i * circleSpeedMs;
                     while (sw.Elapsed.TotalMilliseconds < expected) { }
                 }
 
-                SetCursorPos((int)(cx + radius), (int)cy);
+                SetCursorPos((int)(cx + rad), (int)cy);
                 mouse_event(0x04, 0, 0, 0, IntPtr.Zero);
 
                 statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
                 statusLabel.Text = "Circle drawn!";
             };
 
-            content.Controls.AddRange(new Control[] { title, sub, radiusLabel, radiusBox, startBtn, statusLabel });
+            content.Controls.AddRange(new Control[] { title, sub, hotkeyLabel, hotkeyBox, setHotkeyBtn, waitLabel, waitBox, speedLabel, speedBox, radiusLabel, radiusBox, startBtn, statusLabel });
         }
 
         private void ShowSquare()
         {
             var title = MakeLabel("Square Draw", 24, FontStyle.Bold, Color.White, 40, 30);
-            var sub = MakeLabel("Position your cursor where you want the top-left corner, then press Start", 11, FontStyle.Regular, Color.FromArgb(100, 100, 110), 40, 75);
+            var sub = MakeLabel("Position cursor, then use hotkey or click Start", 11, FontStyle.Regular, Color.FromArgb(100, 100, 110), 40, 70);
 
-            var sizeLabel = MakeLabel("Size (px):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, 120);
+            int y = 120;
+            int gap = 45;
+
+            var hotkeyLabel = MakeLabel("Hotkey:", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y);
+            var hotkeyBox = new TextBox
+            {
+                Location = new Point(160, y - 3),
+                Size = new Size(100, 30),
+                BackColor = cardColor,
+                ForeColor = accentColor,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 11),
+                Text = "O",
+                ReadOnly = true
+            };
+
+            var setHotkeyBtn = new Button
+            {
+                Text = "Set",
+                Location = new Point(270, y - 5),
+                Size = new Size(60, 32),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = hoverColor,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10),
+                Cursor = Cursors.Hand
+            };
+            setHotkeyBtn.FlatAppearance.BorderSize = 0;
+
+            var waitLabel = MakeLabel("Wait (sec):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y + gap);
+            var waitBox = new TextBox
+            {
+                Location = new Point(160, y + gap - 3),
+                Size = new Size(100, 30),
+                BackColor = cardColor,
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 11),
+                Text = "1.5"
+            };
+
+            var speedLabel = MakeLabel("Speed (ms):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y + gap * 2);
+            var speedBox = new TextBox
+            {
+                Location = new Point(160, y + gap * 2 - 3),
+                Size = new Size(100, 30),
+                BackColor = cardColor,
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 11),
+                Text = "3"
+            };
+
+            var sizeLabel = MakeLabel("Size (px):", 11, FontStyle.Regular, Color.FromArgb(160, 160, 170), 40, y + gap * 3);
             var sizeBox = new TextBox
             {
-                Location = new Point(160, 117),
+                Location = new Point(160, y + gap * 3 - 3),
                 Size = new Size(100, 30),
                 BackColor = cardColor,
                 ForeColor = Color.White,
@@ -426,13 +678,13 @@ namespace ENIApp
                 Text = "300"
             };
 
-            var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, 200);
+            var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, y + gap * 4 + 20);
             statusLabel.Size = new Size(600, 30);
 
             var startBtn = new Button
             {
                 Text = "Start Drawing",
-                Location = new Point(40, 165),
+                Location = new Point(40, y + gap * 4 + 55),
                 Size = new Size(220, 40),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = accentColor,
@@ -442,14 +694,49 @@ namespace ENIApp
             };
             startBtn.FlatAppearance.BorderSize = 0;
 
+            setHotkeyBtn.Click += (s, e) =>
+            {
+                hotkeyBox.Text = "Press a key...";
+                hotkeyListening = true;
+                pendingHotkeyBox = hotkeyBox;
+                Thread t = new Thread(() =>
+                {
+                    while (hotkeyListening)
+                    {
+                        for (int i = 1; i < 256; i++)
+                        {
+                            if (GetAsyncKeyState(i) == -32767)
+                            {
+                                squareHotkey = i;
+                                Keys k = (Keys)i;
+                                string name = k.ToString();
+                                try { this.Invoke(new Action(() => { hotkeyBox.Text = name; hotkeyListening = false; })); } catch { }
+                                return;
+                            }
+                        }
+                        Thread.Sleep(10);
+                    }
+                });
+                t.IsBackground = true;
+                t.Start();
+            };
+
             startBtn.Click += (s, e) =>
             {
-                int size = 300;
-                int.TryParse(sizeBox.Text, out size);
+                double waitSec = 1.5;
+                double.TryParse(waitBox.Text, out waitSec);
+                double spd = 3;
+                double.TryParse(speedBox.Text, out spd);
+                int sz = 300;
+                int.TryParse(sizeBox.Text, out sz);
+
+                squareWaitMs = (int)(waitSec * 1000);
+                squareSpeedMs = spd;
+
                 statusLabel.ForeColor = accentColor;
                 statusLabel.Text = "Get ready... move cursor to top-left corner!";
                 content.Refresh();
-                System.Threading.Thread.Sleep(1500);
+                Thread.Sleep(squareWaitMs);
 
                 POINT pos;
                 GetCursorPos(out pos);
@@ -461,38 +748,37 @@ namespace ENIApp
 
                 int stepsPerSide = 200;
                 SetCursorPos((int)sx, (int)sy);
-                System.Threading.Thread.Sleep(100);
+                Thread.Sleep(100);
                 mouse_event(0x02, 0, 0, 0, IntPtr.Zero);
 
                 var sw = Stopwatch.StartNew();
-                double targetMs = 3.0;
 
                 for (int i = 0; i <= stepsPerSide; i++)
                 {
                     double t = (double)i / stepsPerSide;
-                    SetCursorPos((int)(sx + size * t), (int)sy);
-                    double expected = i * targetMs;
+                    SetCursorPos((int)(sx + sz * t), (int)sy);
+                    double expected = i * squareSpeedMs;
                     while (sw.Elapsed.TotalMilliseconds < expected) { }
                 }
                 for (int i = 0; i <= stepsPerSide; i++)
                 {
                     double t = (double)i / stepsPerSide;
-                    SetCursorPos((int)(sx + size), (int)(sy + size * t));
-                    double expected = (stepsPerSide + i) * targetMs;
+                    SetCursorPos((int)(sx + sz), (int)(sy + sz * t));
+                    double expected = (stepsPerSide + i) * squareSpeedMs;
                     while (sw.Elapsed.TotalMilliseconds < expected) { }
                 }
                 for (int i = 0; i <= stepsPerSide; i++)
                 {
                     double t = (double)i / stepsPerSide;
-                    SetCursorPos((int)(sx + size - size * t), (int)(sy + size));
-                    double expected = (stepsPerSide * 2 + i) * targetMs;
+                    SetCursorPos((int)(sx + sz - sz * t), (int)(sy + sz));
+                    double expected = (stepsPerSide * 2 + i) * squareSpeedMs;
                     while (sw.Elapsed.TotalMilliseconds < expected) { }
                 }
                 for (int i = 0; i <= stepsPerSide; i++)
                 {
                     double t = (double)i / stepsPerSide;
-                    SetCursorPos((int)sx, (int)(sy + size - size * t));
-                    double expected = (stepsPerSide * 3 + i) * targetMs;
+                    SetCursorPos((int)sx, (int)(sy + sz - sz * t));
+                    double expected = (stepsPerSide * 3 + i) * squareSpeedMs;
                     while (sw.Elapsed.TotalMilliseconds < expected) { }
                 }
 
@@ -502,7 +788,7 @@ namespace ENIApp
                 statusLabel.Text = "Square drawn!";
             };
 
-            content.Controls.AddRange(new Control[] { title, sub, sizeLabel, sizeBox, startBtn, statusLabel });
+            content.Controls.AddRange(new Control[] { title, sub, hotkeyLabel, hotkeyBox, setHotkeyBtn, waitLabel, waitBox, speedLabel, speedBox, sizeLabel, sizeBox, startBtn, statusLabel });
         }
 
         private void ShowSettings()
@@ -511,7 +797,9 @@ namespace ENIApp
             var versionInfo = MakeLabel("App Version: " + Program.CurrentVersion, 11, FontStyle.Regular, Color.FromArgb(120, 120, 130), 40, 80);
             var repoInfo = MakeLabel("Repo: github.com/drk6/.exe-app", 11, FontStyle.Regular, Color.FromArgb(120, 120, 130), 40, 110);
 
-            content.Controls.AddRange(new Control[] { title, versionInfo, repoInfo });
+            var hotkeyInfo = MakeLabel("Circle hotkey: " + ((Keys)circleHotkey).ToString() + "  |  Square hotkey: " + ((Keys)squareHotkey).ToString(), 11, FontStyle.Regular, accentColor, 40, 160);
+
+            content.Controls.AddRange(new Control[] { title, versionInfo, repoInfo, hotkeyInfo });
         }
 
         private Label MakeLabel(string text, float size, FontStyle style, Color color, int x, int y)
