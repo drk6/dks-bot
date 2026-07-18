@@ -895,7 +895,7 @@ namespace ENIApp
                                     if (args.Data != null && args.Data.Contains("https://github.com/login/device"))
                                     {
                                         deviceUrl = args.Data.Trim();
-                                        try { Process.Start("cmd", "/c start " + deviceUrl); } catch { }
+                                        try { Process.Start(new ProcessStartInfo { FileName = deviceUrl, UseShellExecute = true }); } catch { }
                                         try { this.Invoke(new Action(() =>
                                         {
                                             statusLabel.Text = "Authorize in browser, then click Login again";
@@ -1161,6 +1161,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
