@@ -285,16 +285,13 @@ namespace ENIApp
             var title = MakeLabel("Welcome to ENI App", 24, FontStyle.Bold, Color.White, 40, 30);
             var sub = MakeLabel("Your all-in-one tool hub", 12, FontStyle.Regular, Color.FromArgb(100, 100, 110), 40, 75);
 
-            var circleCard = MakeCard("Circle Draw", "Draw a perfect circle on your desktop", 40, 130, 280, 120);
-            circleCard.Click += (s, e) => ShowPage("circle");
-
-            var squareCard = MakeCard("Square Draw", "Draw a perfect square on your desktop", 340, 130, 280, 120);
-            squareCard.Click += (s, e) => ShowPage("square");
+            var circleCard = MakeCard("Circle Draw", "Draw a perfect circle on your desktop", 40, 130, 280, 120, new EventHandler((s, e) => ShowPage("circle")));
+            var squareCard = MakeCard("Square Draw", "Draw a perfect square on your desktop", 340, 130, 280, 120, new EventHandler((s, e) => ShowPage("square")));
 
             content.Controls.AddRange(new Control[] { title, sub, circleCard, squareCard });
         }
 
-        private Panel MakeCard(string title, string desc, int x, int y, int w, int h)
+        private Panel MakeCard(string title, string desc, int x, int y, int w, int h, EventHandler onClick)
         {
             var card = new Panel
             {
@@ -309,7 +306,8 @@ namespace ENIApp
                 Font = new Font("Segoe UI", 13, FontStyle.Bold),
                 ForeColor = accentColor,
                 Location = new Point(15, 15),
-                AutoSize = true
+                AutoSize = true,
+                BackColor = Color.Transparent
             };
 
             var d = new Label
@@ -318,8 +316,13 @@ namespace ENIApp
                 Font = new Font("Segoe UI", 10),
                 ForeColor = Color.FromArgb(120, 120, 130),
                 Location = new Point(15, 50),
-                Size = new Size(w - 30, 40)
+                Size = new Size(w - 30, 40),
+                BackColor = Color.Transparent
             };
+
+            card.Click += onClick;
+            t.Click += onClick;
+            d.Click += onClick;
 
             card.Controls.AddRange(new Control[] { t, d });
             card.Cursor = Cursors.Hand;
@@ -519,7 +522,8 @@ namespace ENIApp
                 Font = new Font("Segoe UI", size, style),
                 ForeColor = color,
                 Location = new Point(x, y),
-                AutoSize = true
+                AutoSize = true,
+                BackColor = Color.Transparent
             };
         }
     }
