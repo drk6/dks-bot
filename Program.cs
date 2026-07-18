@@ -1004,6 +1004,9 @@ namespace ENIApp
             var title = MakeLabel("Dev Panel", 24, FontStyle.Bold, accentColor, 40, 30);
             var info = MakeLabel("Logged in as: " + loggedInUser, 11, FontStyle.Regular, Color.FromArgb(120, 120, 130), 40, 75);
 
+            var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, 350);
+            statusLabel.Size = new Size(600, 100);
+
             var forceUpdateBtn = new Button
             {
                 Text = "Force Update - Bump Version",
@@ -1026,11 +1029,21 @@ namespace ENIApp
                 ForeColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle,
                 Font = new Font("Segoe UI", 11),
-                Text = "1.0.1"
+                Text = "1.0.11"
             };
 
-            var statusLabel = MakeLabel("", 11, FontStyle.Regular, accentColor, 40, 240);
-            statusLabel.Size = new Size(600, 100);
+            var releaseUpdateBtn = new Button
+            {
+                Text = "Release Update (force=false → force=true)",
+                Location = new Point(40, 230),
+                Size = new Size(300, 45),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(200, 150, 0),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            releaseUpdateBtn.FlatAppearance.BorderSize = 0;
 
             forceUpdateBtn.Click += (s, e) =>
             {
@@ -1068,7 +1081,63 @@ namespace ENIApp
                         if (putResp.IsSuccessStatusCode)
                         {
                             statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
-                            statusLabel.Text = "Version bumped to " + newVersion + " (FORCE UPDATE)!\r\nAll users will auto-update on next launch.";
+                            statusLabel.Text = "Version bumped to " + newVersion + " (force=true)!\r\nAll users will auto-update on next launch.";
+                        }
+                        else
+                        {
+                            statusLabel.ForeColor = Color.Red;
+                            statusLabel.Text = "Failed: " + putResp.StatusCode;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    statusLabel.ForeColor = Color.Red;
+                    statusLabel.Text = "Error: " + ex.Message;
+                }
+            };
+
+            releaseUpdateBtn.Click += (s, e) =>
+            {
+                statusLabel.ForeColor = accentColor;
+                statusLabel.Text = "Fetching current version...";
+                content.Refresh();
+
+                try
+                {
+                    using (HttpClient client = new HttpClient())
+                    {
+                        client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
+                        client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
+
+                        string versionUrl = "https://api.github.com/repos/" + Program.GitHubUser + "/" + Program.GitHubRepo + "/contents/version.txt";
+                        string getResp = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
+                        dynamic getVersionJson = Program.ParseJson(getResp);
+                        string currentSha = ((Dictionary<string,object>)getVersionJson)["sha"].ToString();
+                        string verContent = Encoding.UTF8.GetString(Convert.FromBase64String(getVersionJson["content"].ToString().Replace("\n", ""))).Trim();
+
+                        string[] parts = verContent.Split('|');
+                        string currentVersion = parts[0].Trim();
+                        bool isForced = parts.Length > 1 && parts[1].Trim().ToLower() == "true";
+
+                        if (isForced)
+                        {
+                            statusLabel.ForeColor = Color.FromArgb(200, 200, 0);
+                            statusLabel.Text = "Already force=true for v" + currentVersion;
+                            return;
+                        }
+
+                        string encodedVersion = Convert.ToBase64String(Encoding.UTF8.GetBytes(currentVersion + "|true\r\n"));
+
+                        string verUpdateBody = "{\"message\":\"Release update v" + currentVersion + " (force=true)\",\"content\":\"" + encodedVersion + "\",\"sha\":\"" + currentSha + "\"}";
+
+                        var verContent2 = new StringContent(verUpdateBody, Encoding.UTF8, "application/json");
+                        HttpResponseMessage putResp = client.PutAsync(versionUrl, verContent2).GetAwaiter().GetResult();
+
+                        if (putResp.IsSuccessStatusCode)
+                        {
+                            statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
+                            statusLabel.Text = "Released v" + currentVersion + " (force=true)!\r\nAll users will auto-update on next launch.";
                         }
                         else
                         {
@@ -1086,8 +1155,8 @@ namespace ENIApp
 
             var uploadBtn = new Button
             {
-                Text = "Release New Update",
-                Location = new Point(40, 280),
+                Text = "Release New Update (upload exe + version, force=false)",
+                Location = new Point(40, 460),
                 Size = new Size(300, 45),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(50, 120, 200),
@@ -1097,7 +1166,7 @@ namespace ENIApp
             };
             uploadBtn.FlatAppearance.BorderSize = 0;
 
-            uploadBtn.Click += (s, e) =>
+uploadBtn.Click += (s, e) =>
             {
                 OpenFileDialog ofd = new OpenFileDialog();
                 ofd.Filter = "Executable|*.exe";
@@ -1105,7 +1174,7 @@ namespace ENIApp
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
                     statusLabel.ForeColor = accentColor;
-                    statusLabel.Text = "Uploading...";
+                    statusLabel.Text = "Uploading exe...";
                     content.Refresh();
 
                     try
@@ -1116,22 +1185,66 @@ namespace ENIApp
                             client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
 
                             string exeUrl = "https://api.github.com/repos/" + Program.GitHubUser + "/" + Program.GitHubRepo + "/contents/app.exe";
-                            string getResp = client.GetStringAsync(exeUrl).GetAwaiter().GetResult();
-                            dynamic getJson = Program.ParseJson(getResp);
-                            string currentSha = ((Dictionary<string,object>)getJson)["sha"].ToString();
+                            string exeResp = client.GetStringAsync(exeUrl).GetAwaiter().GetResult();
+                            dynamic exeJson = Program.ParseJson(exeResp);
+                            string exeSha = ((Dictionary<string,object>)exeJson)["sha"].ToString();
 
                             byte[] exeBytes = File.ReadAllBytes(ofd.FileName);
                             string encodedExe = Convert.ToBase64String(exeBytes);
 
-                            string updateBody = "{\"message\":\"Update app.exe\",\"content\":\"" + encodedExe + "\",\"sha\":\"" + currentSha + "\"}";
+                            string updateBody = "{\"message\":\"Update app.exe\",\"content\":\"" + encodedExe + "\",\"sha\":\"" + exeSha + "\"}";
 
                             var content2 = new StringContent(updateBody, Encoding.UTF8, "application/json");
                             HttpResponseMessage putResp = client.PutAsync(exeUrl, content2).GetAwaiter().GetResult();
 
                             if (putResp.IsSuccessStatusCode)
                             {
-                                statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
-                                statusLabel.Text = "app.exe uploaded!\r\nBump version to force users to update.";
+                                // Also bump version with force=false
+                                string versionUrl = "https://api.github.com/repos/" + Program.GitHubUser + "/" + Program.GitHubRepo + "/contents/version.txt";
+                                string verResp = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
+                                dynamic verJson = Program.ParseJson(verResp);
+                                string verSha = ((Dictionary<string,object>)verJson)["sha"].ToString();
+
+                                // Extract version from current bumpBox or use existing
+                                string newVersion = bumpBox.Text.Trim();
+                                if (string.IsNullOrEmpty(newVersion))
+                                {
+                                    // Try to parse from current version
+                                    string verResp2 = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
+                                    dynamic verJson2 = Program.ParseJson(verResp2);
+                                    string verContent = Encoding.UTF8.GetString(Convert.FromBase64String(verJson2["content"].ToString().Replace("\n", ""))).Trim();
+                                    string[] verParts = verContent.Split('|');
+                                    string currVer = verParts[0].Trim();
+                                    // Increment patch version
+                                    string[] verNums = currVer.Split('.');
+                                    int patch;
+                                    if (verNums.Length >= 3 && int.TryParse(verNums[2], out patch))
+                                    {
+                                        newVersion = verNums[0] + "." + verNums[1] + "." + (patch + 1);
+                                    }
+                                    else
+                                    {
+                                        newVersion = currVer + ".1";
+                                    }
+                                }
+
+                                string encodedVersion = Convert.ToBase64String(Encoding.UTF8.GetBytes(newVersion + "|false\r\n"));
+
+                                string verUpdateBody = "{\"message\":\"Release v" + newVersion + " (force=false)\",\"content\":\"" + encodedVersion + "\",\"sha\":\"" + verSha + "\"}";
+
+                                var verContent2 = new StringContent(updateBody, Encoding.UTF8, "application/json");
+                                HttpResponseMessage verPutResp = client.PutAsync(versionUrl, verContent2).GetAwaiter().GetResult();
+
+                                if (verPutResp.IsSuccessStatusCode)
+                                {
+                                    statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
+                                    statusLabel.Text = "app.exe uploaded + version " + newVersion + " (force=false)!\r\nPress \"Release Update\" when ready to force users.";
+                                }
+                                else
+                                {
+                                    statusLabel.ForeColor = Color.Red;
+                                    statusLabel.Text = "exe uploaded but version bump failed: " + verPutResp.StatusCode;
+                                }
                             }
                             else
                             {
@@ -1148,7 +1261,7 @@ namespace ENIApp
                 }
             };
 
-            content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel, bumpBox, statusLabel, uploadBtn });
+            content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel, bumpBox, releaseUpdateBtn, statusLabel, uploadBtn });
         }
 
         private void ShowSettings()
@@ -1166,6 +1279,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
