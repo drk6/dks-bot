@@ -27,6 +27,15 @@ namespace ENIApp
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
+            try
+            {
+                string dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                string oldFile = Path.Combine(dir, "app.old.exe");
+                if (File.Exists(oldFile))
+                    File.Delete(oldFile);
+            }
+            catch { }
+
             if (CheckForUpdate())
                 return;
 
@@ -86,29 +95,35 @@ namespace ENIApp
 
                     string currentPath = Assembly.GetExecutingAssembly().Location;
                     string dir = Path.GetDirectoryName(currentPath);
-                    string newPath = Path.Combine(dir, "app.exe.new");
+                    string newPath = Path.Combine(dir, "app.new.exe");
+                    string oldPath = Path.Combine(dir, "app.old.exe");
                     string batPath = Path.Combine(dir, "update.bat");
 
                     File.WriteAllBytes(newPath, exeBytes);
 
                     string bat = "@echo off\r\n" +
-                        "timeout /t 3 /nobreak >nul\r\n" +
-                        "del /f /q \"" + currentPath + "\"\r\n" +
+                        ":wait\r\n" +
+                        "tasklist /FI \"IMAGENAME eq app.exe\" | find /i \"app.exe\" >nul\r\n" +
+                        "if not errorlevel 1 (\r\n" +
+                        "  timeout /t 1 /nobreak >nul\r\n" +
+                        "  goto wait\r\n" +
+                        ")\r\n" +
+                        "del /f /q \"" + oldPath + "\" 2>nul\r\n" +
+                        "ren \"" + currentPath + "\" \"app.old.exe\" 2>nul\r\n" +
                         "ren \"" + newPath + "\" \"app.exe\"\r\n" +
                         "start \"\" \"" + currentPath + "\"\r\n" +
-                        "del /f /q \"" + batPath + "\"\r\n";
+                        "del /f /q \"" + batPath + "\" 2>nul\r\n";
 
                     File.WriteAllText(batPath, bat);
 
                     ProcessStartInfo psi = new ProcessStartInfo();
-                    psi.FileName = "cmd.exe";
-                    psi.Arguments = "/c \"" + batPath + "\"";
+                    psi.FileName = batPath;
                     psi.WindowStyle = ProcessWindowStyle.Hidden;
                     psi.CreateNoWindow = true;
                     psi.UseShellExecute = true;
                     Process.Start(psi);
 
-                    Thread.Sleep(1000);
+                    Thread.Sleep(500);
                     Environment.Exit(0);
                 }
             }
@@ -1133,6 +1148,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
