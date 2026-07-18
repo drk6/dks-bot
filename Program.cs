@@ -1151,117 +1151,9 @@ namespace ENIApp
                     statusLabel.ForeColor = Color.Red;
                     statusLabel.Text = "Error: " + ex.Message;
                 }
-            };
+};
 
-            var uploadBtn = new Button
-            {
-                Text = "Release New Update (upload exe + version, force=false)",
-                Location = new Point(40, 460),
-                Size = new Size(300, 45),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(50, 120, 200),
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 12, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            uploadBtn.FlatAppearance.BorderSize = 0;
-
-uploadBtn.Click += (s, e) =>
-            {
-                OpenFileDialog ofd = new OpenFileDialog();
-                ofd.Filter = "Executable|*.exe";
-                ofd.Title = "Select app.exe to upload";
-                if (ofd.ShowDialog() == DialogResult.OK)
-                {
-                    statusLabel.ForeColor = accentColor;
-                    statusLabel.Text = "Uploading exe...";
-                    content.Refresh();
-
-                    try
-                    {
-                        using (HttpClient client = new HttpClient())
-                        {
-                            client.DefaultRequestHeaders.Add("User-Agent", "ENI-App");
-                            client.DefaultRequestHeaders.Add("Authorization", "token " + loginToken);
-
-                            string exeUrl = "https://api.github.com/repos/" + Program.GitHubUser + "/" + Program.GitHubRepo + "/contents/app.exe";
-                            string exeResp = client.GetStringAsync(exeUrl).GetAwaiter().GetResult();
-                            dynamic exeJson = Program.ParseJson(exeResp);
-                            string exeSha = ((Dictionary<string,object>)exeJson)["sha"].ToString();
-
-                            byte[] exeBytes = File.ReadAllBytes(ofd.FileName);
-                            string encodedExe = Convert.ToBase64String(exeBytes);
-
-                            string updateBody = "{\"message\":\"Update app.exe\",\"content\":\"" + encodedExe + "\",\"sha\":\"" + exeSha + "\"}";
-
-                            var content2 = new StringContent(updateBody, Encoding.UTF8, "application/json");
-                            HttpResponseMessage putResp = client.PutAsync(exeUrl, content2).GetAwaiter().GetResult();
-
-                            if (putResp.IsSuccessStatusCode)
-                            {
-                                // Also bump version with force=false
-                                string versionUrl = "https://api.github.com/repos/" + Program.GitHubUser + "/" + Program.GitHubRepo + "/contents/version.txt";
-                                string verResp = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
-                                dynamic verJson = Program.ParseJson(verResp);
-                                string verSha = ((Dictionary<string,object>)verJson)["sha"].ToString();
-
-                                // Extract version from current bumpBox or use existing
-                                string newVersion = bumpBox.Text.Trim();
-                                if (string.IsNullOrEmpty(newVersion))
-                                {
-                                    // Try to parse from current version
-                                    string verResp2 = client.GetStringAsync(versionUrl).GetAwaiter().GetResult();
-                                    dynamic verJson2 = Program.ParseJson(verResp2);
-                                    string verContent = Encoding.UTF8.GetString(Convert.FromBase64String(verJson2["content"].ToString().Replace("\n", ""))).Trim();
-                                    string[] verParts = verContent.Split('|');
-                                    string currVer = verParts[0].Trim();
-                                    // Increment patch version
-                                    string[] verNums = currVer.Split('.');
-                                    int patch;
-                                    if (verNums.Length >= 3 && int.TryParse(verNums[2], out patch))
-                                    {
-                                        newVersion = verNums[0] + "." + verNums[1] + "." + (patch + 1);
-                                    }
-                                    else
-                                    {
-                                        newVersion = currVer + ".1";
-                                    }
-                                }
-
-                                string encodedVersion = Convert.ToBase64String(Encoding.UTF8.GetBytes(newVersion + "|false\r\n"));
-
-                                string verUpdateBody = "{\"message\":\"Release v" + newVersion + " (force=false)\",\"content\":\"" + encodedVersion + "\",\"sha\":\"" + verSha + "\"}";
-
-                                var verContent2 = new StringContent(updateBody, Encoding.UTF8, "application/json");
-                                HttpResponseMessage verPutResp = client.PutAsync(versionUrl, verContent2).GetAwaiter().GetResult();
-
-                                if (verPutResp.IsSuccessStatusCode)
-                                {
-                                    statusLabel.ForeColor = Color.FromArgb(0, 255, 100);
-                                    statusLabel.Text = "app.exe uploaded + version " + newVersion + " (force=false)!\r\nPress \"Release Update\" when ready to force users.";
-                                }
-                                else
-                                {
-                                    statusLabel.ForeColor = Color.Red;
-                                    statusLabel.Text = "exe uploaded but version bump failed: " + verPutResp.StatusCode;
-                                }
-                            }
-                            else
-                            {
-                                statusLabel.ForeColor = Color.Red;
-                                statusLabel.Text = "Failed: " + putResp.StatusCode;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        statusLabel.ForeColor = Color.Red;
-                        statusLabel.Text = "Error: " + ex.Message;
-                    }
-                }
-            };
-
-            content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel, bumpBox, releaseUpdateBtn, statusLabel, uploadBtn });
+content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel, bumpBox, releaseUpdateBtn, statusLabel });
         }
 
         private void ShowSettings()
@@ -1279,6 +1171,7 @@ uploadBtn.Click += (s, e) =>
         }
     }
 }
+
 
 
 
