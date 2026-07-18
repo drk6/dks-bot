@@ -175,12 +175,11 @@ namespace ENIApp
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(30, 30, 30),
-                Padding = new Padding(10, 10, 10, 10)
+                Margin = new Padding(200, 0, 0, 0)
             };
 
             Controls.Add(content);
             Controls.Add(sidebar);
-            sidebar.BringToFront();
 
             ShowPage("home");
         }
