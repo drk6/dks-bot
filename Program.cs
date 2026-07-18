@@ -1007,7 +1007,7 @@ namespace ENIApp
 
             var uploadBtn = new Button
             {
-                Text = "Upload app.exe from local",
+                Text = "Release New Update",
                 Location = new Point(40, 280),
                 Size = new Size(300, 45),
                 FlatStyle = FlatStyle.Flat,
