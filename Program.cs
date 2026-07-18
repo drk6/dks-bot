@@ -315,6 +315,9 @@ public static bool CheckForUpdate()
                 CheckDevStatus();
             }
 
+            // Subscribe to update ready event
+            Program.UpdateReady += OnUpdateReady;
+
             ShowPage("home");
         }
 
@@ -580,6 +583,57 @@ public static bool CheckForUpdate()
                 case "dev": ShowDev(); break;
                 case "login": ShowLogin(); break;
             }
+        }
+
+        private void OnUpdateReady()
+        {
+            try
+            {
+                this.Invoke(new Action(() =>
+                {
+                    var panel = new Panel
+                    {
+                        Location = new Point(40, 40),
+                        Size = new Size(400, 100),
+                        BackColor = Color.FromArgb(35, 35, 42)
+                    };
+                    var label = new Label
+                    {
+                        Text = "Update ready! Restart to apply.",
+                        Font = new Font("Segoe UI", 12, FontStyle.Regular),
+                        ForeColor = Color.White,
+                        Location = new Point(15, 15),
+                        AutoSize = true
+                    };
+                    var restartBtn = new Button
+                    {
+                        Text = "Restart to Update",
+                        Location = new Point(15, 50),
+                        Size = new Size(180, 40),
+                        FlatStyle = FlatStyle.Flat,
+                        BackColor = Color.FromArgb(0, 200, 255),
+                        ForeColor = Color.Black,
+                        Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                        Cursor = Cursors.Hand
+                    };
+                    restartBtn.FlatAppearance.BorderSize = 0;
+                    restartBtn.Click += (s, e) =>
+                    {
+                        // Launch self with --install-update flag and exit
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = Assembly.GetExecutingAssembly().Location,
+                            Arguments = "--install-update",
+                            UseShellExecute = true
+                        });
+                        Environment.Exit(0);
+                    };
+                    panel.Controls.AddRange(new Control[] { label, restartBtn });
+                    content.Controls.Add(panel);
+                    panel.BringToFront();
+                }));
+            }
+            catch { }
         }
 
         private void ShowHome()
@@ -1211,6 +1265,7 @@ content.Controls.AddRange(new Control[] { title, info, forceUpdateBtn, bumpLabel
         }
     }
 }
+
 
 
 
