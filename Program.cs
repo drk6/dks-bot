@@ -772,9 +772,10 @@ namespace ENIApp
                     devButton.Visible = false;
                     try
                     {
+                        string ghLogout = "C:\\Program Files\\GitHub CLI\\gh.exe";
                         Process.Start(new ProcessStartInfo
                         {
-                            FileName = "gh",
+                            FileName = ghLogout,
                             Arguments = "auth logout --hostname github.com",
                             WindowStyle = ProcessWindowStyle.Hidden,
                             CreateNoWindow = true
@@ -819,20 +820,29 @@ namespace ENIApp
                     {
                         try
                         {
+                            string ghPath = "C:\\Program Files\\GitHub CLI\\gh.exe";
+                            if (!File.Exists(ghPath))
+                            {
+                                string[] paths = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles).Split('\\');
+                                string programFiles = string.Join("\\", paths);
+                                ghPath = Path.Combine(programFiles, "GitHub CLI", "gh.exe");
+                            }
+                            if (!File.Exists(ghPath))
+                            {
+                                ghPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GitHub CLI", "gh.exe");
+                            }
+
                             Process ghProcess = new Process();
-                            ghProcess.StartInfo.FileName = "gh";
+                            ghProcess.StartInfo.FileName = ghPath;
                             ghProcess.StartInfo.Arguments = "auth login --hostname github.com --git-protocol https --web";
-                            ghProcess.StartInfo.UseShellExecute = false;
-                            ghProcess.StartInfo.RedirectStandardOutput = true;
-                            ghProcess.StartInfo.RedirectStandardError = true;
-                            ghProcess.StartInfo.CreateNoWindow = true;
+                            ghProcess.StartInfo.UseShellExecute = true;
                             ghProcess.Start();
                             ghProcess.WaitForExit(120000);
 
                             if (ghProcess.ExitCode == 0)
                             {
                                 Process tokenProcess = new Process();
-                                tokenProcess.StartInfo.FileName = "gh";
+                                tokenProcess.StartInfo.FileName = ghPath;
                                 tokenProcess.StartInfo.Arguments = "auth token --hostname github.com";
                                 tokenProcess.StartInfo.UseShellExecute = false;
                                 tokenProcess.StartInfo.RedirectStandardOutput = true;

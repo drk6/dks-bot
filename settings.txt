@@ -1,0 +1,9 @@
+circleHotkey=0
+squareHotkey=0
+circleWaitMs=1500
+squareWaitMs=1500
+circleSpeedMs=6
+squareSpeedMs=3
+loginToken=
+isLoggedIn=False
+loggedInUser=
