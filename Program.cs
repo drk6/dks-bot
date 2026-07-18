@@ -876,7 +876,7 @@ namespace ENIApp
                                 try { this.Invoke(new Action(() =>
                                 {
                                     statusLabel.ForeColor = accentColor;
-                                    statusLabel.Text = "Opening browser for GitHub login...";
+                                    statusLabel.Text = "Authorize in browser, then keep the cmd window open. Press Enter there if prompted.";
                                     content.Refresh();
                                 })); } catch { }
 
@@ -1142,6 +1142,7 @@ namespace ENIApp
         }
     }
 }
+
 
 
 
